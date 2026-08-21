@@ -56,9 +56,15 @@ class TestGetLongValue:
         assert get_long_value("<!--a-->", "<!--/a-->", "<!--A-->m<!--/A-->") == "m"
 
     def test_close_at_index_zero_reads_as_absent(self):
-        """Java's guard is `> 0`, not `>= 0` (HTMLWriter.java:4539). A closing
-        tag at position zero is indistinguishable from no closing tag."""
-        assert get_long_value("<!--A-->", "<!--/A-->", "<!--/A--><!--A-->m") is None
+        """Java's guard is `> 0`, not `>= 0` (HTMLWriter.java:4539). When the
+        closing tag resolves to index 0 — here because it is the same string
+        as the opening tag, so both find the same position — Java treats it as
+        absent and returns null. With `end < 0` this would instead return the
+        empty string, which is why the boundary needs its own test: the
+        previous version of this test used a closer positioned BEFORE the
+        opener, where find returns -1 and both guards agree.
+        """
+        assert get_long_value("<!--A-->", "<!--A-->", "<!--A-->x") is None
 
 
 class TestSwapLongValue:
