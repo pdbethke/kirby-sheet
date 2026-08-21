@@ -15,8 +15,13 @@ from tests.corpus import oracle_path
 #: Values neither side can agree on, blanked in BOTH outputs before comparing.
 #: Two come off the wall clock, one off a file's mtime, one off its path.
 #: Everything else is expected to match byte for byte.
+#:
+#: The EXPORT_ID pattern is word-boundary anchored so it cannot consume part
+#: of a longer digit run (e.g. `id=1234567890123456789` would otherwise lose
+#: its first 14 digits to an unanchored match). Anchoring it to its
+#: surrounding markup instead of \b is deferred to Milestone 2.
 _VOLATILE = (
-    re.compile(r"\d{4}\d{2}\d{2}\d{6}"),                      # EXPORT_ID
+    re.compile(r"\b\d{14}\b"),                                # EXPORT_ID
     re.compile(r"[A-Z][a-z]{2}, \d{1,2} [A-Z][a-z]{2} \d{4} \d{2}:\d{2}:\d{2}"),
 )
 
