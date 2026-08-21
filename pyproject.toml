@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kirby-sheet"
+version = "0.1.0"
+description = "Render a HERO Designer character through HD's own .hde export templates, byte for byte."
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.10"
+authors = [{ name = "Peter D Bethke" }]
+keywords = ["hero-system", "champions", "hero-designer", "rpg", "tabletop"]
+
+# Same posture as kirby-cost: source-available, not OSI-approved, so no SPDX
+# short identifier exists and LicenseRef- is the correct form.
+license = "LicenseRef-PolyForm-Noncommercial-1.0.0"
+license-files = ["LICENSE"]
+
+dependencies = ["kirby-cost>=0.2.2"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4.0", "mypy>=1.5.0", "black>=23.0.0", "flake8>=6.0.0"]
+
+# No [project.scripts] yet. The entry point arrives with cli.py; declaring
+# "kirby_sheet.cli:main" before that module exists installs without complaint
+# and then fails with ImportError the first time anyone runs it.
+
+[tool.setuptools.packages.find]
+include = ["kirby_sheet*"]
+exclude = ["tests*"]

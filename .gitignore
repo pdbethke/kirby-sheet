@@ -1,0 +1,75 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+
+# Environment
+.env
+.env.local
+
+# Local test inputs — absolute paths into licensed material on one machine.
+# .env.test.example is the tracked template.
+.env.test
+
+.venv/
+.claude/
+.worktrees/
+
+# Licensed / private material — MUST NEVER be committed.
+# HERODesignerSource/ is Simon Ubsdell's licensed Hero Designer Java source
+# (personal-use license, purchased 2026-04-07). legal/ holds the purchase
+# receipts. Committing either puts them in history permanently.
+HERODesignerSource/
+legal/
+
+# Derived Hero Games content — MUST NEVER be committed.
+#
+# tests/fixtures/oracle/ is 655 JSON dumps of characters from the HERO System
+# Bestiary, Champions Villains 1-2 and the HERO System Equipment Guide: 651
+# named characters with their power names and full costed builds. That is a
+# machine-readable reproduction of published stat blocks, however useful it is
+# as a test corpus.
+#
+# They are generated, not authored, from packs you own — but the generator is
+# not here either: it drives a headless build of HERO Designer to dump HD's own
+# costs, and that harness wraps licensed source, so it cannot be published. The
+# tests that need these fixtures skip without them, and the suite passes.
+#
+# The .hdc files are Champions Villains character files themselves, and
+# roundtrip_hd6_costs.json is one character's costed build. Same rule.
+tests/fixtures/oracle/
+tests/fixtures/*.hdc
+tests/fixtures/roundtrip_hd6_costs.json
