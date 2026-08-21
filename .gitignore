@@ -73,3 +73,4 @@ legal/
 tests/fixtures/oracle/
 tests/fixtures/*.hdc
 tests/fixtures/roundtrip_hd6_costs.json
+.superpowers/
