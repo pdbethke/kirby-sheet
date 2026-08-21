@@ -34,3 +34,25 @@ def test_unknown_tokens_are_left_alone():
     """Milestone 2 fills these in. Until then they must survive untouched, so
     the gate reports them as diffs rather than silently blanking them."""
     assert _render("<!--STR-->") == "<!--STR-->"
+
+
+def test_the_substitution_order_is_load_bearing():
+    """The order in render() is HD's order (HTMLWriter.java:290-313), and it
+    is observable: a value that itself contains a later token's marker gets
+    that marker substituted by the later call.
+
+    APP_VERSION is applied BEFORE TIMESTAMP, so an app_version of
+    "<!--TIMESTAMP-->" is injected first and then replaced, giving "TS|TS".
+    Reverse the two calls and the injected marker arrives too late to be
+    replaced, leaving "<!--TIMESTAMP-->|TS". Every other test here uses inert
+    values and passes under any permutation.
+    """
+    out = render(
+        Template(text="<!--APP_VERSION-->|<!--TIMESTAMP-->"),
+        app_version="<!--TIMESTAMP-->",
+        timestamp="TS",
+        export_id="EID",
+        save_timestamp="STS",
+        character_file="CF",
+    )
+    assert out == "TS|TS"
