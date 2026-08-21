@@ -1,0 +1,16 @@
+<!--TEMPLATE_NAME-->kirby-sheet minimal<!--/TEMPLATE_NAME-->
+<!--TEMPLATE_DESCRIPTION-->
+Exercises each primitive once. Not a character sheet.
+<!--/TEMPLATE_DESCRIPTION-->
+<!--FILE_EXTENSION-->html<!--/FILE_EXTENSION-->
+<html>
+  <head><title>kirby-sheet minimal</title></head>
+  <body>
+    <p>version: <!--APP_VERSION--></p>
+    <p>exported: <!--TIMESTAMP--></p>
+    <p>id: <!--EXPORT_ID--></p>
+    <p>saved: <!--CHARACTER_SAVE_TIMESTAMP--></p>
+    <p>file: <!--CHARACTER_FILE--></p>
+    <p>again: <!--APP_VERSION--></p>
+  </body>
+</html>
