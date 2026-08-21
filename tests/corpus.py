@@ -35,3 +35,23 @@ def character_path() -> Path | None:
 
 def oracle_path() -> Path | None:
     return _from_env("KIRBY_SHEET_ORACLE")
+
+
+def why_unavailable() -> str:
+    """Which inputs are missing, and whether they were unset or mispointed.
+
+    `_from_env` deliberately answers None for both "not set" and "set to a
+    path that does not exist" — the same choice kirby-cost's corpus.py makes.
+    That is safe for resolution and dangerous for reporting: a CI job whose
+    oracle path moved would skip exactly like a contributor who has no Hero
+    Designer, and both would read as green. Naming the difference here is what
+    keeps a broken setup from looking like an intentional one.
+    """
+    problems = []
+    for var in ("KIRBY_SHEET_ORACLE", "KIRBY_SHEET_HDC"):
+        raw = (os.environ.get(var) or "").strip()
+        if not raw:
+            problems.append(f"{var} unset")
+        elif not Path(raw).exists():
+            problems.append(f"{var} points at a path that does not exist: {raw}")
+    return "; ".join(problems)

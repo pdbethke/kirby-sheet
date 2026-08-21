@@ -13,14 +13,14 @@ import pytest
 
 from kirby_sheet.render import render
 from kirby_sheet.template import Template
-from tests.corpus import character_path, oracle_path
+from tests.corpus import character_path, oracle_path, why_unavailable
 from tests.oracle import normalise, oracle_export
 
 MINIMAL = Path(__file__).parent / "fixtures" / "minimal.hde"
 
 pytestmark = pytest.mark.skipif(
     not (oracle_path() and character_path()),
-    reason="KIRBY_SHEET_ORACLE or KIRBY_SHEET_HDC unset",
+    reason=why_unavailable() or "oracle and character both available",
 )
 
 
