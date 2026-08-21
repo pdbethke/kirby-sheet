@@ -60,13 +60,17 @@ def test_the_documents_are_byte_identical():
     """The milestone's real assertion.
 
     minimal.hde deliberately contains one latin-1 non-ASCII byte (\\xa0, a
-    non-breaking space) inside static text in the TEMPLATE_DESCRIPTION
-    block, untouched by any substitution. template.py deliberately mangles
-    latin-1 bytes the way `new String(data)` does on a UTF-8 JVM, and until
-    this byte was added that mangling was asserted only by a unit test
-    encoding our own belief about Java's behaviour — nothing checked that
-    belief against HD itself. With the byte present, this gate proves the
-    mangling against the real oracle output instead.
+    non-breaking space) in a static <p> line in the <body> — a part of the
+    document that render() does not consume or remove, so the byte survives
+    into the compared output. (It was first placed in the
+    TEMPLATE_DESCRIPTION block, which render() strips before comparison, so
+    that placement never exercised anything — the body is load-bearing
+    here.) template.py deliberately mangles latin-1 bytes the way
+    `new String(data)` does on a UTF-8 JVM, and until this byte was added
+    that mangling was asserted only by a unit test encoding our own belief
+    about Java's behaviour — nothing checked that belief against HD itself.
+    With the byte present, this gate proves the mangling against the real
+    oracle output instead.
     """
     character = character_path()
     hd = normalise(oracle_export(MINIMAL, character))
