@@ -10,6 +10,8 @@ a number that already has one, and the two would drift.
 """
 from __future__ import annotations
 
+import os
+
 from kirby_sheet.sheet import (CharacteristicRow, Entry, Identity, Section,
                                Sheet, Totals)
 
@@ -36,6 +38,19 @@ def build_sheet(hero) -> Sheet:
     )
 
 
+def sheet_from_hdc(path: str | os.PathLike) -> Sheet:
+    """Load a character file and build its Sheet.
+
+    Here rather than in the CLI so that `build.py` remains the only module in
+    this package that imports kirby-cost. That is not tidiness: it is why
+    every other module's tests run without a character file, a template, or
+    the engine installed.
+    """
+    from kirby_cost.io.hdc_loader import HDCLoader
+    hero = HDCLoader().load_file(str(path))
+    return build_sheet(hero)
+
+
 def _identity(hero) -> Identity:
     return Identity(
         name=hero.name or "",
@@ -59,10 +74,10 @@ def _characteristic(char) -> CharacteristicRow:
     return CharacteristicRow(
         xmlid=char.xmlid or "",
         name=char.display or "",
-        value=int(char.characteristic_value()),
-        base=int(char.get_base_value()),
-        cost=int(char.real_cost),
-        active_cost=int(char.active_cost),
+        value=float(char.characteristic_value()),
+        base=float(char.get_base_value()),
+        cost=float(char.real_cost),
+        active_cost=float(char.active_cost),
         total=char.value_display() or "",
         roll=char.roll() or "",
         notes=char.display_notes or "",
@@ -87,10 +102,11 @@ def _entry(obj) -> Entry:
         alias=obj.alias or "",
         xmlid=obj.xmlid or "",
         display=obj.column2_output,
-        cost=int(obj.real_cost),
-        cost_before_framework=int(obj.real_cost_pre_list),
-        active_cost=int(obj.active_cost),
-        end=int(obj.end_usage or 0),
+        cost=float(obj.real_cost),
+        cost_before_framework=float(obj.real_cost_pre_list),
+        active_cost=float(obj.active_cost),
+        end=float(obj.end_usage or 0),
+        parent_id=str(getattr(obj, "parent_id", "") or ""),
     )
 
 

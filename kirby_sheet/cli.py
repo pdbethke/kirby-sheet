@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 from typing import Callable
 
-from kirby_sheet.build import build_sheet
+from kirby_sheet.build import sheet_from_hdc
 from kirby_sheet.formats.as_json import to_json
 from kirby_sheet.sheet import Sheet
 
@@ -61,16 +61,15 @@ def main(argv: list[str] | None = None) -> int:
     render = _FORMATS[format_name]
 
     try:
-        # Imported here, not at module scope: this is the only function that
-        # touches kirby-cost, and importing it lazily keeps a bare `--help`
-        # from paying for (or requiring) a template load.
-        from kirby_cost.io.hdc_loader import HDCLoader
-        hero = HDCLoader().load_file(str(character_path))
+        # sheet_from_hdc is the only function that touches kirby-cost. It is
+        # called here rather than at module scope so that a bare `--help`
+        # never pays for (or requires) a template load.
+        sheet = sheet_from_hdc(character_path)
     except Exception as exc:
         print(f"kirby-sheet: {exc}", file=sys.stderr)
         return 1
 
-    document = render(build_sheet(hero))
+    document = render(sheet)
 
     if args.output:
         Path(args.output).write_text(document, encoding="utf-8")

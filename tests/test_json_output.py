@@ -3,7 +3,7 @@ import json
 
 from kirby_sheet.build import build_sheet
 from kirby_sheet.formats.as_json import to_json
-from tests.test_build import _char, _hero, _obj
+from tests.test_build import _hero, _obj
 
 
 def _doc(**kw):

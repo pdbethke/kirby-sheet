@@ -33,10 +33,10 @@ class CharacteristicRow:
     """One row of the characteristics block."""
     xmlid: str
     name: str
-    value: int
-    base: int
-    cost: int
-    active_cost: int
+    value: float
+    base: float
+    cost: float
+    active_cost: float
     total: str          # already a display string in kirby-cost
     roll: str           # already a display string in kirby-cost
     notes: str
@@ -58,10 +58,11 @@ class Entry:
     alias: str
     xmlid: str
     display: str        # kirby-cost's column2_output, already exact
-    cost: int
-    cost_before_framework: int
-    active_cost: int
-    end: int
+    cost: float
+    cost_before_framework: float
+    active_cost: float
+    end: float
+    parent_id: str = ""
 
 
 @dataclass(frozen=True)
