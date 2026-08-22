@@ -18,8 +18,18 @@ already have.
 
 ## Development
 
+    python -m venv venv && source venv/bin/activate
+    pip install -e ../kirby-cost          # ALWAYS, and first
     pip install -e ".[dev]"
     python -m pytest tests/ -q
+
+**Install the sibling editable, and do it first.** `kirby-cost` is published,
+so `pip` will happily resolve the dependency pin against PyPI and give you a
+release that is behind the checkout next door — same version number, different
+code. That is not a hypothetical: this package was built for a day against a
+stale 0.2.2 and read a character's STR as 5 instead of 15 before anyone
+noticed. Nothing fails loudly when it happens, because a stale dependency
+installs perfectly.
 
 Tests that need Hero Designer skip when it is absent:
 
