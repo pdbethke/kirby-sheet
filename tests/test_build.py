@@ -35,7 +35,16 @@ class MockCharacteristic:
 
 
 def _char(xmlid="STR", **kw):
-    return MockCharacteristic(xmlid=xmlid, **kw)
+    """Every numeric field differs, so a test can tell which is which. A stub
+    whose values coincide cannot detect two fields being swapped."""
+    base = dict(xmlid=xmlid, display="STR",
+                characteristic_value=15.0,   # distinct
+                get_base_value=10.0,         # distinct
+                real_cost=5.0,               # distinct
+                active_cost=7.0,             # distinct
+                value_display="15", roll="12-", display_notes="")
+    base.update(kw)
+    return MockCharacteristic(**base)
 
 
 def _obj(**kw):
@@ -97,6 +106,19 @@ def test_every_section_is_present_even_when_empty():
 def test_totals_are_carried_across():
     s = build_sheet(_hero(total_points=276.0, available_points=39.0))
     assert (s.totals.total_points, s.totals.available_points) == (276.0, 39.0)
+
+
+def test_each_characteristic_field_takes_its_own_source():
+    """A type check cannot catch two fields being swapped, and every other
+    test here would pass if `value` held the base and `base` held the current
+    value. Each stub value is distinct so this test can tell them apart."""
+    row = build_sheet(_hero(characteristics=[_char()])).characteristics[0]
+    assert row.value == 15          # characteristic_value(), not base
+    assert row.base == 10           # get_base_value(), not the current value
+    assert row.cost == 5            # real_cost, not active_cost
+    assert row.active_cost == 7     # active_cost, not real_cost
+    assert row.total == "15"        # value_display(), verbatim
+    assert row.roll == "12-"        # roll(), verbatim
 
 
 def test_an_object_whose_display_raises_is_reported_not_swallowed():
