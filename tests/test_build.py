@@ -4,12 +4,38 @@ from types import SimpleNamespace
 from kirby_sheet.build import build_sheet
 
 
+class MockCharacteristic:
+    """Stub characteristic matching the shape of real kirby-cost Characteristic."""
+    def __init__(self, xmlid="STR", display="STR", characteristic_value=5.0, get_base_value=10.0,
+                 real_cost=5.0, active_cost=5.0, value_display="15", roll="12-",
+                 display_notes="", **kw):
+        self.xmlid = xmlid
+        self.display = display
+        self._characteristic_value = characteristic_value
+        self._get_base_value = get_base_value
+        self.real_cost = real_cost
+        self.active_cost = active_cost
+        self._value_display = value_display
+        self._roll = roll
+        self.display_notes = display_notes
+        for k, v in kw.items():
+            setattr(self, k, v)
+
+    def characteristic_value(self):
+        return self._characteristic_value
+
+    def get_base_value(self):
+        return self._get_base_value
+
+    def value_display(self):
+        return self._value_display
+
+    def roll(self):
+        return self._roll
+
+
 def _char(xmlid="STR", **kw):
-    base = dict(xmlid=xmlid, display="STR", characteristic_value=15.0, base_value=10.0,
-                real_cost=5.0, active_cost=5.0, value_display="15", roll="12-",
-                display_notes="")
-    base.update(kw)
-    return SimpleNamespace(**base)
+    return MockCharacteristic(xmlid=xmlid, **kw)
 
 
 def _obj(**kw):

@@ -28,7 +28,7 @@ def build_sheet(hero) -> Sheet:
     """A Sheet for one character."""
     return Sheet(
         identity=_identity(hero),
-        characteristics=tuple(_characteristic(c, hero) for c in hero.characteristics),
+        characteristics=tuple(_characteristic(c) for c in hero.characteristics),
         sections=tuple(Section(name=name,
                                entries=tuple(_entry(o) for o in getattr(hero, attr, ()) or ()))
                        for name, attr in _SECTIONS),
@@ -49,36 +49,22 @@ def _identity(hero) -> Identity:
     )
 
 
-def _characteristic(char, hero) -> CharacteristicRow:
+def _characteristic(char) -> CharacteristicRow:
     """One characteristic row.
 
     `total` and `roll` are taken verbatim: kirby-cost already produces them as
     display strings ("15", "12-"), and formatting them again here would be
     doing twice, differently, what is already exact.
     """
-    # Handle both test mocks (SimpleNamespace with attributes) and real Characteristic objects (with methods)
-    cv = char.characteristic_value() if callable(char.characteristic_value) else char.characteristic_value
-    vd = char.value_display() if callable(char.value_display) else char.value_display
-    roll = char.roll() if callable(char.roll) else char.roll
-    bv = char.base_value
-
-    # For real characteristics, use LoadedHero's computed total value and calculate base
-    if hasattr(hero, 'characteristic_value') and callable(hero.characteristic_value):
-        total_value = hero.characteristic_value(char.xmlid)
-        # Base is the difference between total and purchased value
-        bv = total_value - cv
-    else:
-        total_value = cv
-
     return CharacteristicRow(
         xmlid=char.xmlid or "",
         name=char.display or "",
-        value=int(cv),
-        base=int(bv),
+        value=int(char.characteristic_value()),
+        base=int(char.get_base_value()),
         cost=int(char.real_cost),
         active_cost=int(char.active_cost),
-        total=str(int(total_value)) if total_value else "",
-        roll=roll or "",
+        total=char.value_display() or "",
+        roll=char.roll() or "",
         notes=char.display_notes or "",
     )
 
