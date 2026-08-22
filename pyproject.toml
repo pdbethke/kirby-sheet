@@ -21,9 +21,8 @@ dependencies = ["kirby-cost>=0.3.0"]
 [project.optional-dependencies]
 dev = ["pytest>=7.4.0", "mypy>=1.5.0", "black>=23.0.0", "flake8>=6.0.0"]
 
-# No [project.scripts] yet. The entry point arrives with cli.py; declaring
-# "kirby_sheet.cli:main" before that module exists installs without complaint
-# and then fails with ImportError the first time anyone runs it.
+[project.scripts]
+kirby-sheet = "kirby_sheet.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["kirby_sheet*"]
