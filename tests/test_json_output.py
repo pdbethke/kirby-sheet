@@ -20,7 +20,7 @@ def test_the_top_level_shape_is_stable():
 
 
 def test_identity_round_trips():
-    assert _doc(name="Bokor", gm="Bill")["identity"]["name"] == "Bokor"
+    assert _doc(name="Bokor", gm="Gamemaster")["identity"]["name"] == "Bokor"
 
 
 def test_sections_are_a_list_of_named_objects_not_a_bare_map():

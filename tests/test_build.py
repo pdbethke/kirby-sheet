@@ -76,8 +76,8 @@ def _hero(**kw):
 
 
 def test_identity_is_carried_across():
-    s = build_sheet(_hero(name="Bokor", gm="Bill"))
-    assert s.identity.name == "Bokor" and s.identity.gm == "Bill"
+    s = build_sheet(_hero(name="Bokor", gm="Gamemaster"))
+    assert s.identity.name == "Bokor" and s.identity.gm == "Gamemaster"
 
 
 def test_a_characteristic_row_takes_its_display_strings_verbatim():
