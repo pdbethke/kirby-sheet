@@ -8,14 +8,32 @@ carry, in keeping with `build.py`'s rule that this package computes nothing.
 """
 from __future__ import annotations
 
+import re
 import textwrap
 
-from kirby_sheet.sheet import Entry, Prose, Section, Sheet
+from kirby_sheet.sheet import Entry, Identity, Prose, Section, Sheet, Totals
 from kirby_sheet.text import plain_text
+
+#: Width of the characteristic name column. "Swimming" (8 chars) is the
+#: longest name kirby-cost produces; anything narrower pushes later columns
+#: out of alignment (Ravel's movement rows did exactly this at width 6).
+_CHAR_NAME_WIDTH = 8
 
 #: The characteristics table's header row. Columns: total value, name, cost,
 #: roll, notes -- in the order `build.py` fills a CharacteristicRow.
-_CHAR_HEADER = f"{'Val':>4}  {'Char':<6} {'Cost':>5}  {'Roll':<4}  Notes"
+_CHAR_HEADER = (f"{'Val':>4}  {'Char':<{_CHAR_NAME_WIDTH}} {'Cost':>5}  "
+                f"{'Roll':<4}  Notes")
+
+#: (Identity attribute, its label), in the order the identity block lists
+#: them. `name` and `alternate_identities` are handled by the header instead.
+_IDENTITY_FIELDS = (
+    ("player_name", "Player"),
+    ("campaign_name", "Campaign"),
+    ("genre", "Genre"),
+    ("gm", "GM"),
+    ("hair_color", "Hair"),
+    ("eye_color", "Eyes"),
+)
 
 #: A pooled framework slot (Multipower/VPP slot etc.) is indented under its
 #: pool. One level: kirby-cost's `hero.powers` nests no deeper than that.
@@ -36,6 +54,7 @@ _PROSE_FIELDS = (
 def to_text(sheet: Sheet, *, width: int = 78) -> str:
     """The sheet, formatted for a terminal or a monospace text file."""
     lines: list[str] = list(_header(sheet.identity, width))
+    lines.extend(_identity_block(sheet.identity, width))
 
     lines.append("")
     lines.extend(_characteristics(sheet.characteristics, width))
@@ -49,6 +68,7 @@ def to_text(sheet: Sheet, *, width: int = 78) -> str:
         lines.extend(_section(section, width))
 
     lines.extend(_prose(sheet.prose, width))
+    lines.extend(_footer(sheet.totals, width))
 
     return "\n".join(lines)
 
@@ -62,14 +82,62 @@ def _header(identity, width: int) -> list[str]:
     return out
 
 
+def _identity_block(identity: Identity, width: int) -> list[str]:
+    """The identity facts a sheet carries, printed under the header.
+
+    Only non-empty fields print -- an empty campaign should not print an
+    empty "Campaign:" label. Height and weight are formatted for reading
+    (see `_fmt_height`/`_fmt_weight`) rather than printed as raw floats.
+    """
+    parts = [f"{label}: {value}" for attr, label in _IDENTITY_FIELDS
+             if (value := getattr(identity, attr))]
+    height = _fmt_height(identity.height)
+    if height:
+        parts.append(f"Height: {height}")
+    weight = _fmt_weight(identity.weight)
+    if weight:
+        parts.append(f"Weight: {weight}")
+
+    if not parts:
+        return []
+    return textwrap.wrap("   ".join(parts), width=width) or []
+
+
+def _footer(totals: Totals, width: int) -> list[str]:
+    """What the character costs -- the first thing a reader looks for."""
+    line = (f"Total: {_fmt_num(totals.total_points)}   "
+            f"Base: {_fmt_num(totals.base_points)}   "
+            f"Complications: {_fmt_num(totals.complication_points)}   "
+            f"Experience: {_fmt_num(totals.experience)}")
+    return ["", "-" * width, *textwrap.wrap(line, width=width)]
+
+
+def _fmt_height(inches: float) -> str:
+    """Inches (kirby-cost's `Hero.height`, per HD's own `getHeight`) as
+    feet'inches" -- 96.45669 becomes 8'0", not a raw float on the sheet."""
+    if not inches:
+        return ""
+    total = round(inches)
+    feet, remainder = divmod(total, 12)
+    return f"{feet}'{remainder}\""
+
+
+def _fmt_weight(pounds: float) -> str:
+    """Pounds (kirby-cost's `Hero.weight` is already in lbs), rounded for
+    display -- 350.53 becomes "351 lbs"."""
+    if not pounds:
+        return ""
+    return f"{round(pounds)} lbs"
+
+
 def _characteristics(rows, width: int) -> list[str]:
     out = [_CHAR_HEADER, "-" * width]
     for row in rows:
         # `total` and `roll` are already display strings from kirby-cost
         # (build.py's docstring: "verbatim") -- printed as-is, not reformatted.
         notes = plain_text(row.notes)
-        line = (f"{row.total:>4}  {row.name:<6} {_fmt_num(row.cost):>5}  "
-                f"{row.roll:<4}")
+        line = (f"{row.total:>4}  {row.name:<{_CHAR_NAME_WIDTH}} "
+                f"{_fmt_num(row.cost):>5}  {row.roll:<4}")
         if notes:
             line = f"{line}  {notes}"
         else:
@@ -82,9 +150,11 @@ def _characteristics(rows, width: int) -> list[str]:
 
 
 def _section(section: Section, width: int) -> list[str]:
-    label = "Cost   END"
-    inner_width = width - 2
-    heading = section.name.upper().ljust(inner_width - len(label)) + label
+    # Cost and END must sit over the columns the entry rows actually put
+    # them in (0-4 and 5-9, per `_entry_lines`'s `prefix`) -- not far off to
+    # the right where no number ever prints.
+    label = f"{'Cost':>5}{'END':>5}"
+    heading = f"{label}  {section.name.upper()}"
     out = [heading, "-" * width]
     for entry in section.entries:
         out.extend(_entry_lines(entry, width))
@@ -120,8 +190,7 @@ def _prose(prose: Prose, width: int) -> list[str]:
         out.append("")
         out.append(heading)
         out.append("-" * width)
-        out.extend(textwrap.wrap(plain_text(text), width=width,
-                                 replace_whitespace=False) or [""])
+        out.extend(_wrap_prose(plain_text(text), width))
 
     notes = [note for note in prose.notes if note]
     if notes:
@@ -129,8 +198,26 @@ def _prose(prose: Prose, width: int) -> list[str]:
         out.append("NOTES")
         out.append("-" * width)
         for note in notes:
-            out.extend(textwrap.wrap(plain_text(note), width=width,
-                                     replace_whitespace=False) or [""])
+            out.extend(_wrap_prose(plain_text(note), width))
+    return out
+
+
+def _wrap_prose(text: str, width: int) -> list[str]:
+    """Wrap prose paragraph by paragraph, preserving blank-line breaks.
+
+    `textwrap.wrap(..., replace_whitespace=False)` on the whole string kept
+    an embedded blank line inside one chunk, so the first word of the next
+    paragraph landed alone on its own line. Splitting on blank lines first
+    and wrapping each paragraph on its own -- with ordinary whitespace
+    collapsing inside a paragraph -- avoids that, and re-inserts the blank
+    line between paragraphs on the output side.
+    """
+    paragraphs = re.split(r"\n\s*\n", text)
+    out: list[str] = []
+    for index, paragraph in enumerate(paragraphs):
+        if index:
+            out.append("")
+        out.extend(textwrap.wrap(paragraph, width=width) or [""])
     return out
 
 

@@ -4,6 +4,7 @@ import os
 import pytest
 
 from kirby_sheet.build import sheet_from_hdc
+from kirby_sheet.formats import as_text
 from kirby_sheet.formats.as_text import to_text
 from kirby_sheet.sheet import (CharacteristicRow, Entry, Identity, Prose,
                                Section, Sheet, Totals)
@@ -103,6 +104,18 @@ def test_characteristic_notes_pass_through_plain_text():
     assert "<i>" not in out
 
 
+def test_characteristic_name_column_fits_the_longest_kirby_cost_name():
+    """"Swimming" (8 chars) is the longest name kirby-cost produces; a
+    narrower column pushes the Cost column out of alignment between rows."""
+    swim = _char_row(name="Swimming", cost=2.0)
+    run = _char_row(name="Running", cost=0.0)
+    out = to_text(_sheet(characteristics=(swim, run)))
+    swim_line = next(l for l in out.splitlines() if "Swimming" in l)
+    run_line = next(l for l in out.splitlines() if "Running" in l
+                    and "Swimming" not in l)
+    assert swim_line.index("2") == run_line.index("0")
+
+
 def test_characteristic_header_row_names_every_column():
     out = to_text(_sheet())
     header = next(l for l in out.splitlines() if "Val" in l)
@@ -175,7 +188,7 @@ def test_a_long_display_string_wraps_with_continuations_aligned_under_text():
     section = Section(name="powers", entries=(entry,))
     out = to_text(_sheet(sections=(section,)), width=78)
     lines = out.splitlines()
-    heading = next(i for i, l in enumerate(lines) if l.startswith("POWERS"))
+    heading = next(i for i, l in enumerate(lines) if "POWERS" in l)
     start = heading + 1
     assert lines[start] == "-" * 78
     body_lines = []
@@ -201,6 +214,63 @@ def test_no_display_line_exceeds_the_requested_width():
         assert len(line) <= 60
 
 
+def test_section_column_labels_sit_over_the_columns_they_name():
+    """Cost and END print at columns 0-9 on every entry row (`prefix` in
+    `_entry_lines`), so the heading's labels must line up there too, not at
+    the far right where no number ever appears."""
+    entry = _entry(cost_before_framework=29.0, end=4.0, display="Growth")
+    section = Section(name="powers", entries=(entry,))
+    out = to_text(_sheet(sections=(section,)))
+    lines = out.splitlines()
+    heading = next(l for l in lines if "POWERS" in l)
+    entry_line = next(l for l in lines if "Growth" in l)
+    # Both fields are right-aligned in the same 5-char width, so it is the
+    # SLICE (columns 0-4, columns 5-9) that must match, not the label's
+    # first character -- "Cost" and "29" end-align, they don't start-align.
+    assert heading[0:5].strip() == "Cost"
+    assert entry_line[0:5].strip() == "29"
+    assert heading[5:10].strip() == "END"
+    assert entry_line[5:10].strip() == "4"
+
+
+# --- footer / identity ----------------------------------------------------
+
+def test_footer_states_the_character_s_cost():
+    totals = Totals(total_points=350.0, available_points=350.0,
+                    base_points=300.0, complication_points=50.0,
+                    experience=25.0)
+    out = to_text(_sheet(totals=totals))
+    assert "350" in out
+    assert "300" in out
+    assert "50" in out
+    assert "25" in out
+
+
+def test_identity_block_prints_only_non_empty_fields():
+    identity = Identity(name="Bokor", player_name="Player-name",
+                        campaign_name="", genre="Genre-name")
+    out = to_text(_sheet(identity=identity))
+    assert "Player-name" in out
+    assert "Genre-name" in out
+    assert "Campaign:" not in out
+
+
+def test_identity_block_formats_height_and_weight_readably():
+    identity = Identity(name="Bokor", height=96.45669, weight=350.53)
+    out = to_text(_sheet(identity=identity))
+    assert "96.45669" not in out
+    assert "350.53" not in out
+    assert "8'0\"" in out
+    assert "351 lbs" in out
+
+
+def test_identity_block_omits_zero_height_and_weight():
+    identity = Identity(name="Bokor", height=0.0, weight=0.0)
+    out = to_text(_sheet(identity=identity))
+    assert "Height:" not in out
+    assert "Weight:" not in out
+
+
 # --- prose ---------------------------------------------------------------
 
 def test_prose_sections_print_only_when_non_empty_each_under_a_heading():
@@ -218,8 +288,20 @@ def test_prose_sections_print_only_when_non_empty_each_under_a_heading():
 
 def test_prose_notes_print_under_a_notes_heading_only_when_non_empty():
     out = to_text(_sheet(prose=Prose(notes=("Note-one", "", "Note-two"))))
-    assert "NOTES" in out
-    assert "Note-one" in out and "Note-two" in out
+    lines = out.splitlines()
+    heading_idx = lines.index("NOTES")
+    rule_idx = heading_idx + 1
+    assert lines[rule_idx] == "-" * 78
+    body = []
+    for l in lines[rule_idx + 1:]:
+        if l == "" or l == "-" * 78:
+            break
+        body.append(l)
+    assert any("Note-one" in l for l in body)
+    assert any("Note-two" in l for l in body)
+    # The empty middle note contributes no line of its own -- an empty note
+    # must not print as a blank body line between the two real ones.
+    assert "" not in body
 
 
 def test_all_prose_empty_prints_no_prose_headings():
@@ -227,6 +309,33 @@ def test_all_prose_empty_prints_no_prose_headings():
     for heading in ("BACKGROUND", "PERSONALITY", "QUOTE", "TACTICS",
                     "CAMPAIGN USE", "APPEARANCE", "NOTES"):
         assert heading not in out
+
+
+def test_prose_paragraph_breaks_do_not_orphan_the_next_word():
+    """An embedded blank line marks a paragraph break. Each paragraph must
+    wrap on its own, with the first word of the second paragraph starting a
+    real line of its own -- not sitting alone on a line by itself because a
+    wrap chunk swallowed the blank line whole."""
+    prose = Prose(background="First paragraph of words that goes on for a "
+                             "good while so it definitely wraps around.\n\n"
+                             "Second paragraph starts here and also runs on "
+                             "for quite a while to force a second wrap.")
+    out = to_text(_sheet(prose=prose))
+    lines = out.splitlines()
+    start = lines.index("BACKGROUND") + 2  # heading, then rule, then body
+    rule = "-" * 78
+    body = []
+    for l in lines[start:]:
+        if l == rule:
+            break
+        body.append(l)
+    # Exactly one blank line separates the two paragraphs.
+    blank_indices = [i for i, l in enumerate(body) if l == ""]
+    assert blank_indices, "no blank line between paragraphs"
+    second_para_start = body[blank_indices[0] + 1]
+    assert second_para_start.startswith("Second paragraph starts here")
+    # The lone-word-orphan bug looked like a line containing only "Second".
+    assert not any(l.strip() == "Second" for l in body)
 
 
 def test_prose_passes_through_plain_text():
@@ -268,3 +377,26 @@ def test_a_real_character_renders_end_to_end():
     out = to_text(sheet)
     assert sheet.identity.name.upper() in out
     assert isinstance(out, str) and out.strip() != ""
+
+    lines = out.splitlines()
+    for section in sheet.sections:
+        if not section.entries:
+            continue
+        heading_line = next(l for l in lines if section.name.upper() in l)
+        heading_idx = lines.index(heading_line)
+        rule_idx = heading_idx + 1
+        body_start = rule_idx + 1
+        body = []
+        for l in lines[body_start:]:
+            if l == "":
+                break
+            body.append(l)
+        # `_entry_lines` is production code, not a re-derivation: it is the
+        # exact function that produced this section's body, so the number
+        # of lines it says an entry takes (1, or more if the display
+        # wrapped) is the ground truth to compare the body against.
+        expected = sum(len(as_text._entry_lines(entry, width=78))
+                       for entry in section.entries)
+        assert len(body) == expected, (
+            f"{section.name}: {len(body)} lines under the heading, "
+            f"expected {expected} for {len(section.entries)} entries")

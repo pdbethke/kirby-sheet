@@ -127,11 +127,11 @@ def _totals(hero) -> Totals:
 def _prose(hero) -> Prose:
     """Prose fields from kirby-cost hero."""
     notes = (
-        getattr(hero, "notes1", "") or "",
-        getattr(hero, "notes2", "") or "",
-        getattr(hero, "notes3", "") or "",
-        getattr(hero, "notes4", "") or "",
-        getattr(hero, "notes5", "") or "",
+        hero.notes1 or "",
+        hero.notes2 or "",
+        hero.notes3 or "",
+        hero.notes4 or "",
+        hero.notes5 or "",
     )
     return Prose(
         background=hero.background or "",
