@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import os
 
-from kirby_sheet.sheet import (CharacteristicRow, Entry, Identity, Section,
-                               Sheet, Totals)
+from kirby_sheet.sheet import (CharacteristicRow, Entry, Identity, Prose,
+                               Section, Sheet, Totals)
 
 #: (Sheet section name, LoadedHero attribute), in the order a sheet lists them.
 _SECTIONS = (
@@ -21,6 +21,7 @@ _SECTIONS = (
     ("perks", "perks"),
     ("talents", "talents"),
     ("powers", "powers"),
+    ("equipment", "equipment"),
     ("martial_arts", "martial_arts"),
     ("complications", "complications"),
 )
@@ -34,6 +35,7 @@ def build_sheet(hero) -> Sheet:
         sections=tuple(Section(name=name,
                                entries=tuple(_entry(o) for o in getattr(hero, attr, ()) or ()))
                        for name, attr in _SECTIONS),
+        prose=_prose(hero),
         totals=_totals(hero),
     )
 
@@ -61,6 +63,8 @@ def _identity(hero) -> Identity:
         gm=hero.gm or "",
         hair_color=hero.hair_color or "",
         eye_color=hero.eye_color or "",
+        height=float(hero.height or 0.0),
+        weight=float(hero.weight or 0.0),
     )
 
 
@@ -117,4 +121,24 @@ def _totals(hero) -> Totals:
         base_points=float(hero.base_points),
         complication_points=float(hero.disad_points),
         experience=float(hero.experience),
+    )
+
+
+def _prose(hero) -> Prose:
+    """Prose fields from kirby-cost hero."""
+    notes = (
+        getattr(hero, "notes1", "") or "",
+        getattr(hero, "notes2", "") or "",
+        getattr(hero, "notes3", "") or "",
+        getattr(hero, "notes4", "") or "",
+        getattr(hero, "notes5", "") or "",
+    )
+    return Prose(
+        background=hero.background or "",
+        personality=hero.personality or "",
+        quote=hero.quote or "",
+        tactics=hero.tactics or "",
+        campaign_use=hero.campaign_use or "",
+        appearance=hero.appearance or "",
+        notes=notes,
     )

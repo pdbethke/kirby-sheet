@@ -3,15 +3,15 @@ import dataclasses
 
 import pytest
 
-from kirby_sheet.sheet import (CharacteristicRow, Entry, Identity, Section,
-                               Sheet, Totals)
+from kirby_sheet.sheet import (CharacteristicRow, Entry, Identity, Prose,
+                               Section, Sheet, Totals)
 
 
 def test_every_class_is_a_frozen_dataclass():
     """Frozen because a backend must not be able to edit the sheet while
     rendering it — HD's own exporter mutates as it renders, and that is the
     behaviour this design deliberately does not inherit."""
-    for cls in (Sheet, Identity, CharacteristicRow, Entry, Section, Totals):
+    for cls in (Sheet, Identity, CharacteristicRow, Entry, Section, Totals, Prose):
         assert dataclasses.is_dataclass(cls), cls
         assert cls.__dataclass_params__.frozen, cls
 
@@ -51,3 +51,13 @@ def test_a_sheets_collections_are_coerced_too():
     sheet = Sheet(characteristics=[], sections=[])
     assert isinstance(sheet.characteristics, tuple)
     assert isinstance(sheet.sections, tuple)
+
+
+def test_prose_is_a_frozen_dataclass_with_tuple_notes():
+    """Prose.notes is a tuple; a list passed in is coerced, following the
+    pattern the other collections use."""
+    p = Prose(background="B", personality="P", quote="Q", tactics="T",
+              campaign_use="C", appearance="A",
+              notes=["1", "2", "3"])
+    assert isinstance(p.notes, tuple)
+    assert p.notes == ("1", "2", "3")

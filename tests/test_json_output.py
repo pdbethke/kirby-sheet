@@ -16,7 +16,7 @@ def test_it_is_valid_json():
 
 def test_the_top_level_shape_is_stable():
     """Consumers key off this; changing it is a breaking change."""
-    assert sorted(_doc()) == ["characteristics", "identity", "sections", "totals"]
+    assert sorted(_doc()) == ["characteristics", "identity", "prose", "sections", "totals"]
 
 
 def test_identity_round_trips():
@@ -28,7 +28,7 @@ def test_sections_are_a_list_of_named_objects_not_a_bare_map():
     sections = _doc()["sections"]
     assert isinstance(sections, list)
     assert [s["name"] for s in sections] == ["skills", "perks", "talents",
-                                             "powers", "martial_arts", "complications"]
+                                             "powers", "equipment", "martial_arts", "complications"]
 
 
 def test_an_entry_exposes_both_costs():

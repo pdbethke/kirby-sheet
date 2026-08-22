@@ -66,9 +66,15 @@ def _hero(**kw):
     base = dict(name="Bokor", alternate_identities="Alt-identities",
                 player_name="Player-name", campaign_name="Campaign-name",
                 genre="Genre", gm="GM-name", hair_color="Hair-color",
-                eye_color="Eye-color",
+                eye_color="Eye-color", height=96.45669291338582,
+                weight=350.5349736900354,
+                background="Background-text", personality="Personality-text",
+                quote="Quote-text", tactics="Tactics-text",
+                campaign_use="Campaign-use-text", appearance="Appearance-text",
+                notes1="Note-1", notes2="Note-2", notes3="Note-3",
+                notes4="Note-4", notes5="Note-5",
                 characteristics=[], powers=[], skills=[], perks=[], talents=[],
-                complications=[], martial_arts=[],
+                complications=[], martial_arts=[], equipment=[],
                 total_points=276.0, available_points=39.0, base_points=270,
                 disad_points=40, experience=5)
     base.update(kw)
@@ -126,7 +132,7 @@ def test_display_is_kirby_costs_column2_output_verbatim():
 def test_every_section_is_present_even_when_empty():
     s = build_sheet(_hero())
     assert [x.name for x in s.sections] == ["skills", "perks", "talents",
-                                            "powers", "martial_arts", "complications"]
+                                            "powers", "equipment", "martial_arts", "complications"]
 
 
 def test_totals_are_carried_across():
@@ -211,3 +217,32 @@ def test_an_object_whose_display_raises_is_reported_not_swallowed():
     with pytest.raises(AttributeError):
         build_sheet(_hero(powers=[Exploding(**{k: v for k, v in vars(_obj()).items()
                                                if k != "column2_output"})]))
+
+
+def test_prose_fields_are_carried():
+    hero = _hero(background="B", personality="P", quote="Q", tactics="T",
+                 campaign_use="C", appearance="A",
+                 notes1="1", notes2="2", notes3="3", notes4="4", notes5="5")
+    p = build_sheet(hero).prose
+    assert p.background == "B"
+    assert p.personality == "P"
+    assert p.quote == "Q"
+    assert p.tactics == "T"
+    assert p.campaign_use == "C"
+    assert p.appearance == "A"
+    assert p.notes == ("1", "2", "3", "4", "5")
+
+
+def test_height_and_weight_are_carried_unrounded():
+    """The model carries what kirby-cost gives. 96.45669 is a real value from
+    a real character; rounding it here would be a computation, and a backend
+    that wants 8'0" can do that itself."""
+    i = build_sheet(_hero(height=96.45669291338582, weight=350.5349736900354)).identity
+    assert i.height == 96.45669291338582
+    assert i.weight == 350.5349736900354
+
+
+def test_equipment_is_a_section():
+    names = [s.name for s in build_sheet(_hero()).sections]
+    assert names == ["skills", "perks", "talents", "powers", "equipment",
+                     "martial_arts", "complications"]

@@ -26,6 +26,8 @@ class Identity:
     gm: str = ""
     hair_color: str = ""
     eye_color: str = ""
+    height: float = 0.0
+    weight: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -81,6 +83,26 @@ class Section:
 
 
 @dataclass(frozen=True)
+class Prose:
+    """Prose fields about a character."""
+    background: str = ""
+    personality: str = ""
+    quote: str = ""
+    tactics: str = ""
+    campaign_use: str = ""
+    appearance: str = ""
+    notes: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        # A tuple ANNOTATION is not enforced at runtime, so `frozen=True`
+        # alone leaves a caller free to pass a list and mutate it afterwards
+        # -- "frozen in name only", which is the thing this module's docstring
+        # warns against. Coercing here makes the guarantee real rather than
+        # advisory. object.__setattr__ because the instance is frozen.
+        object.__setattr__(self, "notes", tuple(self.notes))
+
+
+@dataclass(frozen=True)
 class Totals:
     """The numbers at the foot of the sheet."""
     total_points: float = 0.0
@@ -96,6 +118,7 @@ class Sheet:
     identity: Identity = field(default_factory=Identity)
     characteristics: tuple[CharacteristicRow, ...] = ()
     sections: tuple[Section, ...] = ()
+    prose: Prose = field(default_factory=Prose)
     totals: Totals = field(default_factory=Totals)
 
     def __post_init__(self) -> None:
