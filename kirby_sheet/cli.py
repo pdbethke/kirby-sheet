@@ -18,12 +18,14 @@ from typing import Callable
 
 from kirby_sheet.build import sheet_from_hdc
 from kirby_sheet.formats.as_json import to_json
+from kirby_sheet.formats.as_text import to_text
 from kirby_sheet.sheet import Sheet
 
 #: format flag name -> renderer. The CLI's only knowledge of what backends
 #: exist; everything else about a format lives in its own module.
 _FORMATS: dict[str, Callable[[Sheet], str]] = {
     "json": to_json,
+    "text": to_text,
 }
 
 

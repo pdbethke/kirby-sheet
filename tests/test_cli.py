@@ -39,6 +39,53 @@ def test_o_writes_the_document_to_a_file_as_utf8(tmp_path, capsys):
     assert "identity" in doc
 
 
+@_needs_character
+def test_text_flag_writes_rendered_sheet_to_stdout(capsys):
+    from kirby_sheet.build import sheet_from_hdc
+    from kirby_sheet.formats.as_text import to_text
+
+    code = main([str(character_path()), "--text"])
+
+    assert code == 0
+    out = capsys.readouterr().out
+    expected = to_text(sheet_from_hdc(character_path()))
+    assert out == expected or out == expected + "\n"
+
+
+@_needs_character
+def test_text_o_writes_the_document_to_a_file_as_utf8(tmp_path, capsys):
+    from kirby_sheet.build import sheet_from_hdc
+    from kirby_sheet.formats.as_text import to_text
+
+    out_file = tmp_path / "sheet.txt"
+
+    code = main([str(character_path()), "--text", "-o", str(out_file)])
+
+    assert code == 0
+    assert capsys.readouterr().out == ""  # went to the file, not stdout
+    doc = out_file.read_bytes().decode("utf-8")
+    assert doc == to_text(sheet_from_hdc(character_path()))
+
+
+def test_json_and_text_together_are_rejected(capsys):
+    code = main(["--json", "--text", "somefile.hdc"])
+
+    assert code != 0
+    err = capsys.readouterr().err
+    assert "not allowed with" in err.lower() or "usage" in err.lower()
+
+
+def test_neither_json_nor_text_is_rejected(tmp_path, capsys):
+    dummy = tmp_path / "x.hdc"
+    dummy.write_text("")
+
+    code = main([str(dummy)])
+
+    assert code != 0
+    err = capsys.readouterr().err
+    assert "usage" in err.lower()
+
+
 def test_missing_input_file_exits_nonzero_and_names_the_path(tmp_path, capsys):
     missing = tmp_path / "nope.hdc"
 
