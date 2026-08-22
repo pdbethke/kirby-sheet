@@ -24,7 +24,7 @@ def test_json_flag_writes_valid_json_to_stdout(capsys):
 
     assert code == 0
     doc = json.loads(capsys.readouterr().out)
-    assert sorted(doc) == ["characteristics", "identity", "sections", "totals"]
+    assert sorted(doc) == ["characteristics", "identity", "prose", "sections", "totals"]
 
 
 @_needs_character
