@@ -70,6 +70,14 @@ class Section:
     name: str
     entries: tuple[Entry, ...] = ()
 
+    def __post_init__(self) -> None:
+        # A tuple ANNOTATION is not enforced at runtime, so `frozen=True`
+        # alone leaves a caller free to pass a list and mutate it afterwards
+        # -- "frozen in name only", which is the thing this module's docstring
+        # warns against. Coercing here makes the guarantee real rather than
+        # advisory. object.__setattr__ because the instance is frozen.
+        object.__setattr__(self, "entries", tuple(self.entries))
+
 
 @dataclass(frozen=True)
 class Totals:
@@ -88,3 +96,12 @@ class Sheet:
     characteristics: tuple[CharacteristicRow, ...] = ()
     sections: tuple[Section, ...] = ()
     totals: Totals = field(default_factory=Totals)
+
+    def __post_init__(self) -> None:
+        # A tuple ANNOTATION is not enforced at runtime, so `frozen=True`
+        # alone leaves a caller free to pass a list and mutate it afterwards
+        # -- "frozen in name only", which is the thing this module's docstring
+        # warns against. Coercing here makes the guarantee real rather than
+        # advisory. object.__setattr__ because the instance is frozen.
+        object.__setattr__(self, "characteristics", tuple(self.characteristics))
+        object.__setattr__(self, "sections", tuple(self.sections))

@@ -38,7 +38,16 @@ def test_a_section_is_named_and_holds_entries():
     assert s.name == "powers" and len(s.entries) == 1
 
 
-def test_entries_are_a_tuple_not_a_list():
-    """A frozen dataclass holding a mutable list is frozen in name only."""
-    s = Section(name="powers", entries=())
+def test_a_list_of_entries_is_coerced_to_a_tuple():
+    """The previous version of this test passed a tuple and asserted it got a
+    tuple, which is true of any implementation. Passing a LIST is what
+    distinguishes a model that enforces immutability from one that merely
+    annotates it."""
+    s = Section(name="powers", entries=[])
     assert isinstance(s.entries, tuple)
+
+
+def test_a_sheets_collections_are_coerced_too():
+    sheet = Sheet(characteristics=[], sections=[])
+    assert isinstance(sheet.characteristics, tuple)
+    assert isinstance(sheet.sections, tuple)
