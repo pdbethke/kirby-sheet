@@ -11,6 +11,7 @@ a number that already has one, and the two would drift.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from kirby_sheet.sheet import (CharacteristicRow, Entry, Identity, Prose,
                                Section, Sheet, Totals)
@@ -51,6 +52,26 @@ def sheet_from_hdc(path: str | os.PathLike) -> Sheet:
     from kirby_cost.io.hdc_loader import HDCLoader
     hero = HDCLoader().load_file(str(path))
     return build_sheet(hero)
+
+
+def copy_hdc(source: str | os.PathLike, target: str | os.PathLike) -> Path:
+    """Load a character file and write it back out as a `.hdc`.
+
+    This is `LoadedHero -> write_hdc`, not `Sheet -> anything`: the Sheet is
+    a view (display strings, costs, totals) and deliberately does not carry
+    the xmlids, modifiers, adders, option ids and levels a rebuilt character
+    file needs. Reconstructing those from a view would be a second source of
+    truth for data that already has one, in kirby-cost.
+
+    kirby-cost's round-trip fidelity is its own release gate (794/794
+    characters). This function's whole job is to not get in its way: it
+    loads and writes, and transforms, normalises or "improves" nothing in
+    between.
+    """
+    from kirby_cost.io.hdc_loader import HDCLoader
+    from kirby_cost.io.hdc_writer import write_hdc
+    hero = HDCLoader().load_file(str(source))
+    return write_hdc(hero, target)
 
 
 def _identity(hero) -> Identity:

@@ -1,9 +1,20 @@
 """LoadedHero -> Sheet. Selection and shape, never arithmetic."""
+import os
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
-from kirby_sheet.build import build_sheet
+from kirby_sheet.build import build_sheet, copy_hdc, sheet_from_hdc
+from tests.corpus import character_path
+
+#: copy_hdc round-trips a real character file through kirby-cost, so it
+#: needs both a .hdc (KIRBY_SHEET_HDC) and kirby-cost's template
+#: (KIRBY_COST_HDT). Neither ships with the repo.
+_needs_character = pytest.mark.skipif(
+    character_path() is None or not (os.environ.get("KIRBY_COST_HDT") or "").strip(),
+    reason="needs KIRBY_SHEET_HDC and KIRBY_COST_HDT",
+)
 
 
 class MockCharacteristic:
@@ -246,3 +257,49 @@ def test_equipment_is_a_section():
     names = [s.name for s in build_sheet(_hero()).sections]
     assert names == ["skills", "perks", "talents", "powers", "equipment",
                      "martial_arts", "complications"]
+
+
+# --- copy_hdc: LoadedHero -> write_hdc, the .hdc round trip ---------------
+#
+# copy_hdc does not go through the Sheet: the Sheet is a view (display
+# strings, costs, totals) and deliberately does not carry the xmlids,
+# modifiers, adders, option ids and levels a rebuilt character file needs.
+# kirby-cost owns round-trip fidelity as its own release gate (794/794
+# characters); these tests only check that copy_hdc does not get in its way.
+
+@_needs_character
+def test_copy_hdc_returns_the_target_path_and_the_file_exists(tmp_path):
+    target_path = tmp_path / "returned.hdc"
+
+    result = copy_hdc(character_path(), target_path)
+
+    assert Path(result) == target_path
+    assert target_path.is_file()
+
+
+@_needs_character
+def test_the_round_tripped_file_reloads_with_the_same_name_and_total_points(tmp_path):
+    target_path = tmp_path / "roundtrip.hdc"
+    source_sheet = sheet_from_hdc(character_path())
+
+    copy_hdc(character_path(), target_path)
+    reloaded_sheet = sheet_from_hdc(target_path)
+
+    assert reloaded_sheet.identity.name == source_sheet.identity.name
+    assert reloaded_sheet.identity.name != ""
+    assert reloaded_sheet.totals.total_points == source_sheet.totals.total_points
+
+
+@_needs_character
+def test_the_round_tripped_file_is_byte_identical_to_the_source(tmp_path):
+    """kirby-cost writes `<NOTES />` the way HD does and preserves the BOM
+    and CRLF line endings, so a clean round trip is expected here. If this
+    ever fails, that is a kirby-cost finding to report -- not something to
+    patch in this package, which is not permitted to transform the bytes."""
+    target_path = tmp_path / "roundtrip.hdc"
+
+    copy_hdc(character_path(), target_path)
+
+    source_bytes = Path(character_path()).read_bytes()
+    target_bytes = target_path.read_bytes()
+    assert target_bytes == source_bytes

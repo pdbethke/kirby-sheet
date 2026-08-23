@@ -2,12 +2,18 @@
 
     kirby-sheet CHAR.hdc --json [-o FILE]
 
-One format flag exists today; `--text`, `--html`, `--hdc` and `--template`
-are the same shape (a Sheet -> str function keyed by flag name), so adding
-one is an entry in `_FORMATS` and a line in the mutually exclusive group --
-not a restructure. None of them are stubbed in here ahead of their own
-backends existing: a flag that parses and then says "not implemented"
-advertises a feature this package does not have yet.
+One format flag exists today; `--text`, `--html` and `--template` are the
+same shape (a Sheet -> str function keyed by flag name), so adding one is an
+entry in `_FORMATS` and a line in the mutually exclusive group -- not a
+restructure. None of them are stubbed in here ahead of their own backends
+existing: a flag that parses and then says "not implemented" advertises a
+feature this package does not have yet.
+
+`--hdc` is not one of those: it does not render a Sheet at all. It runs
+`LoadedHero -> write_hdc` (`copy_hdc` in `build.py`, the only module here
+permitted to import kirby-cost) and writes a binary UTF-16 `.hdc` document,
+so it is handled separately from `_FORMATS` and requires `-o` -- there is no
+useful way to write that document to a terminal or down a text pipe.
 """
 from __future__ import annotations
 
@@ -16,7 +22,7 @@ import sys
 from pathlib import Path
 from typing import Callable
 
-from kirby_sheet.build import sheet_from_hdc
+from kirby_sheet.build import copy_hdc, sheet_from_hdc
 from kirby_sheet.formats.as_html import to_html
 from kirby_sheet.formats.as_json import to_json
 from kirby_sheet.formats.as_text import to_text
@@ -41,6 +47,8 @@ def _build_parser() -> argparse.ArgumentParser:
     for name in _FORMATS:
         formats.add_argument(f"--{name}", action="store_true",
                               help=f"write the sheet as {name.upper()}")
+    formats.add_argument("--hdc", action="store_true",
+                          help="write a HERO Designer .hdc file (requires -o)")
     parser.add_argument("-o", "--output", metavar="FILE",
                          help="write to FILE instead of stdout (UTF-8)")
     return parser
@@ -60,6 +68,23 @@ def main(argv: list[str] | None = None) -> int:
         print(f"kirby-sheet: character file not found: {character_path}",
               file=sys.stderr)
         return 1
+
+    if args.hdc:
+        if not args.output:
+            print("kirby-sheet: --hdc requires -o FILE "
+                  "(a .hdc file is UTF-16 binary; writing it to stdout is "
+                  "not useful)", file=sys.stderr)
+            return 2
+        try:
+            # copy_hdc is the only function that touches kirby-cost here,
+            # same as sheet_from_hdc below -- it does not build a Sheet at
+            # all, so it is called on its own path rather than through
+            # _FORMATS.
+            copy_hdc(character_path, args.output)
+        except Exception as exc:
+            print(f"kirby-sheet: {exc}", file=sys.stderr)
+            return 1
+        return 0
 
     format_name = next(name for name in _FORMATS if getattr(args, name))
     render = _FORMATS[format_name]

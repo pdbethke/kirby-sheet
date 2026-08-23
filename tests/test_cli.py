@@ -141,3 +141,39 @@ def test_unset_hdt_env_names_the_variable(monkeypatch, capsys):
     assert code != 0
     err = capsys.readouterr().err
     assert "KIRBY_COST_HDT" in err
+
+
+# --- --hdc: LoadedHero -> write_hdc, not through the Sheet -----------------
+
+@_needs_character
+def test_hdc_flag_without_o_is_rejected(capsys):
+    code = main([str(character_path()), "--hdc"])
+
+    assert code != 0
+    err = capsys.readouterr().err
+    assert "-o" in err
+
+
+@_needs_character
+def test_hdc_flag_with_o_writes_a_file_that_reloads_with_the_same_name(tmp_path):
+    from kirby_sheet.build import sheet_from_hdc
+
+    out_file = tmp_path / "roundtrip.hdc"
+    source_sheet = sheet_from_hdc(character_path())
+
+    code = main([str(character_path()), "--hdc", "-o", str(out_file)])
+
+    assert code == 0
+    assert out_file.is_file()
+    reloaded = sheet_from_hdc(out_file)
+    assert reloaded.identity.name == source_sheet.identity.name
+    assert reloaded.totals.total_points == source_sheet.totals.total_points
+
+
+def test_cli_does_not_import_kirby_cost_directly():
+    """build.py is the only module in this package permitted to import
+    kirby-cost -- cli.py reaches --hdc through `copy_hdc`, not through
+    kirby-cost itself."""
+    import kirby_sheet.cli as module
+    source = open(module.__file__, encoding="utf-8").read()
+    assert "kirby_cost" not in source
