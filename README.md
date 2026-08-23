@@ -44,7 +44,11 @@ Tests that need Hero Designer skip when it is absent:
 | Variable | What it names |
 |---|---|
 | `KIRBY_SHEET_HDC` | a `.hdc` character |
-| `KIRBY_SHEET_ORACLE` | `hd6cli.sh` from kirby-hd-oracle |
+| `KIRBY_SHEET_ORACLE` | a headless Hero Designer CLI to compare against |
+
+The oracle is a harness around licensed Hero Designer source and is not
+distributable, so the tests that use it skip for everyone but the maintainer.
+The rest of the suite runs on a clean checkout.
 
 ## Where this is going
 
