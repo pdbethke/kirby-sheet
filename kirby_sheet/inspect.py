@@ -6,13 +6,41 @@ toward replacing Hero Designer's own export tooling, which this project
 deliberately does not do -- see `kirby_sheet/template.py` and the project
 brief. This module only inspects.
 
-**How "resolved" is determined.** `render()` is called on the template with
-a set of harmless sentinel values, and the token set before is compared
-against the token set after. Whatever disappeared is what the renderer
-handles -- there is no second, hand-maintained list of "the tokens we
+**What "resolved" means.** A token is "resolved" if it does NOT survive
+rendering -- whichever mechanism made it disappear. Substitution
+(`swap_value`) is one such mechanism; so is a paired block being stripped
+whole because it names a token `render()` does not implement (see below).
+For a person building a worklist, both cases mean the same thing: nothing
+to do. A token is only worklist-worthy if it is still sitting in the
+rendered output, unresolved.
+
+**How it is measured.** `render()` is called on the template with a set of
+harmless sentinel values, and the token set before is compared against the
+token set after. Whatever disappeared is "resolved" by the definition
+above -- there is no second, hand-maintained list of "the tokens we
 support" to drift out of sync with `render.py` the day someone adds one.
 See `tests/test_inspect.py::test_tracks_the_renderer_not_a_hardcoded_list`
 for the guard that proves this module actually measures rather than lists.
+
+**Stripping counts as resolved, and that is a deliberate choice, not a
+bug.** `render()`'s `swap_all_long_values` strips a paired block such as
+`TEMPLATE_NAME` or `TEMPLATE_DESCRIPTION` as a whole unit. If that block's
+own text happens to *name* another token -- e.g. prose inside
+`TEMPLATE_DESCRIPTION` that says "uses <!--CHARACTER_NAME-->" -- that named
+token vanishes along with the block, and is reported resolved even though
+it was never substituted. See
+`tests/test_inspect.py::test_a_token_named_only_inside_a_stripped_block_is_reported_resolved`,
+which pins this on purpose: whatever removed the token from the rendered
+output, it does not survive rendering, so it needs no work either way.
+
+**`FILE_EXTENSION` never appears in `tokens_used` at all.**
+`Template.from_path` (see `kirby_sheet/template.py`) reads and REMOVES the
+`FILE_EXTENSION` block before `inspect_template` ever sees `template.text`
+-- mirroring Java's `HTMLWriter.getFileExtensions()` (HTMLWriter.java:3901),
+which consumes and removes that block in its constructor. So a template
+loaded via `Template.from_path` reports one fewer distinct token name than
+its raw file text contains, by design: `inspect_template` describes
+`template.text`, and `FILE_EXTENSION` is no longer part of it.
 
 A token's identity is its bare tag NAME -- upper-cased, with any leading
 `/` stripped -- not the raw `<!--TAG-->` marker text. A paired block such
@@ -60,10 +88,14 @@ def _tokens_in_order(text: str) -> tuple[str, ...]:
 
 @dataclass(frozen=True)
 class TemplateReport:
-    """`tokens_used` is every distinct token NAME the template contains (an
-    opener and its closer count as one), in first-appearance order.
-    `tokens_resolved` and `tokens_unresolved` partition it: every used token
-    is in exactly one of the two, in that same order."""
+    """`tokens_used` is every distinct token NAME `template.text` contains
+    (an opener and its closer count as one), in first-appearance order --
+    note that `FILE_EXTENSION` is never among them if the template came from
+    `Template.from_path`; see the module docstring. `tokens_resolved` and
+    `tokens_unresolved` partition it: every used token is in exactly one of
+    the two, in that same order. "Resolved" means the token does not survive
+    rendering -- by substitution, or because it sat inside a block that was
+    stripped whole; see the module docstring."""
 
     tokens_used: tuple[str, ...]
     tokens_resolved: tuple[str, ...]
@@ -71,7 +103,9 @@ class TemplateReport:
 
 
 def inspect_template(template: Template) -> TemplateReport:
-    """Measure which of `template`'s tokens `render()` actually resolves."""
+    """Measure which of `template`'s tokens do not survive `render()` --
+    substituted or stripped, either counts as resolved. See the module
+    docstring for why "resolved" is defined that way."""
     used = _tokens_in_order(template.text)
     rendered = render(template, **_SENTINELS)
     survived = set(_tokens_in_order(rendered))

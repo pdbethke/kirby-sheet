@@ -101,6 +101,9 @@ def main(argv: list[str] | None = None) -> int:
         args = parser.parse_args(argv)
 
         if args.inspect:
+            if args.character:
+                parser.error("--inspect takes a template, not a character "
+                             "-- pass the .hde template alone")
             return _run_inspect(args)
 
         if not args.character:

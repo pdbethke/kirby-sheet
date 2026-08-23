@@ -305,6 +305,18 @@ def test_the_round_tripped_character_reloads_unchanged(tmp_path):
     assert ([(c.xmlid, c.value, c.cost, c.total, c.roll) for c in target_sheet.characteristics]
             == [(c.xmlid, c.value, c.cost, c.total, c.roll) for c in source_sheet.characteristics])
 
+    # Count-only comparison would pass even if every entry lost its modifiers
+    # (same counts, same section names, wrong display/cost) -- compare the
+    # entries themselves, not just how many of them there are.
+    target_entries = [(e.display, e.cost_before_framework, e.end)
+                       for s in target_sheet.sections for e in s.entries]
+    source_entries = [(e.display, e.cost_before_framework, e.end)
+                       for s in source_sheet.sections for e in s.entries]
+    assert target_entries != []
+    assert target_entries == source_entries
+    assert target_sheet.prose == source_sheet.prose
+    assert target_sheet.identity == source_sheet.identity
+
 
 @_needs_character
 def test_the_round_trip_normalises_bom_and_line_endings(tmp_path):

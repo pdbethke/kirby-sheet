@@ -208,6 +208,23 @@ def test_inspect_flag_missing_template_names_the_path(tmp_path, capsys):
     assert str(missing) in err
 
 
+def test_inspect_with_a_character_argument_is_rejected(tmp_path, capsys):
+    """kirby-sheet CHAR.hdc --inspect T.hde must not silently ignore the
+    character -- --inspect takes a template, not a character."""
+    template = tmp_path / "t.hde"
+    template.write_text("<!--APP_VERSION-->")
+    character = tmp_path / "char.hdc"
+    character.write_text("not really an hdc")
+
+    code = main([str(character), "--inspect", str(template)])
+
+    assert code != 0
+    err = capsys.readouterr().err
+    assert "--inspect" in err
+    assert "template" in err.lower()
+    assert "character" in err.lower()
+
+
 def test_inspect_and_json_together_are_rejected(tmp_path, capsys):
     template = tmp_path / "t.hde"
     template.write_text("x")

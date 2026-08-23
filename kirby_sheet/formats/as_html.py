@@ -167,6 +167,15 @@ def _entry_row(entry: Entry) -> str:
         f"<td>{_fmt_num(entry.cost_before_framework)}</td>"
         f"<td>{_fmt_num(entry.end)}</td>"
         # `display` carries HD's own markup -- unescaped, deliberately.
+        # It also carries HD's double spaces (e.g. after "Name:  Power" --
+        # 32/46/26 such runs measured across Bokor/Ravel/PowerLad). Those
+        # bytes are preserved exactly here and NOT collapsed by this
+        # backend; a browser renders runs of whitespace inside <td> as one
+        # space per normal HTML whitespace rules, and HD's own HTML export
+        # puts the same strings in the same kind of cell -- so what a
+        # reader sees matches HD's own output. This is not a bug to "fix"
+        # by touching the bytes; it is the browser's whitespace handling,
+        # matching HD's.
         f"<td>{entry.display}</td>"
         "</tr>"
     )

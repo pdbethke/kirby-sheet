@@ -44,6 +44,25 @@ def test_tokens_used_counts_each_token_once():
     assert report.tokens_used == ("APP_VERSION",)
 
 
+def test_a_token_named_only_inside_a_stripped_block_is_reported_resolved():
+    """This is INTENDED, not a bug: TEMPLATE_DESCRIPTION's block is stripped
+    whole by swap_all_long_values, so CHARACTER_NAME -- named only in its
+    prose, never implemented by render() -- disappears along with it and is
+    reported resolved. "Resolved" here means "does not survive rendering",
+    and that is true regardless of whether substitution or stripping is what
+    removed it -- for a worklist, a token that isn't in the output needs no
+    work either way. See the module docstring for the ruling."""
+    template = Template(
+        text="<!--TEMPLATE_DESCRIPTION-->uses <!--CHARACTER_NAME--><!--/TEMPLATE_DESCRIPTION--> body"
+    )
+
+    report = inspect_template(template)
+
+    assert report.tokens_used == ("TEMPLATE_DESCRIPTION", "CHARACTER_NAME")
+    assert report.tokens_resolved == ("TEMPLATE_DESCRIPTION", "CHARACTER_NAME")
+    assert report.tokens_unresolved == ()
+
+
 def test_a_paired_block_counts_as_one_token_not_two():
     """TEMPLATE_NAME's opener and closer are the same token: render() strips
     the whole block as a unit, and a worklist should not list a thing twice
@@ -54,6 +73,18 @@ def test_a_paired_block_counts_as_one_token_not_two():
 
     assert report.tokens_used == ("TEMPLATE_NAME",)
     assert report.tokens_resolved == ("TEMPLATE_NAME",)
+
+
+def test_mixed_case_token_spellings_fold_to_one_token():
+    """HD's swap_value matches case-insensitively (engine.py:39 reproduces
+    that), so <!--APP_VERSION--> and <!--app_version--> name the same token,
+    not two -- a template author mixing case should not double-count."""
+    template = Template(text="<!--APP_VERSION--> and <!--app_version-->")
+
+    report = inspect_template(template)
+
+    assert report.tokens_used == ("APP_VERSION",)
+    assert report.tokens_resolved == ("APP_VERSION",)
 
 
 def test_the_three_tuples_are_consistent():
