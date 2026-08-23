@@ -38,12 +38,15 @@ from kirby_sheet.sheet import Sheet
 #
 # - No `td, th { padding: ... }` rule. Any nonzero CSS `padding` on a cell
 #   -- even a fraction of a point, nowhere near the crash above -- makes
-#   xhtml2pdf silently ABANDON the `<colgroup>` widths `as_html.py` emits
-#   (see `to_html`'s `print_mode`): the description/Notes column collapses
-#   to a sliver and the table's last two headers print on top of each
-#   other. Cell padding for the print path is the HTML `cellpadding`
-#   attribute on `<table>` instead (`as_html._TABLE_OPEN`), which xhtml2pdf
-#   honours without discarding column widths.
+#   xhtml2pdf silently ABANDON the `width=` attributes `as_html.py` puts on
+#   each `<th>` (see `to_html`'s `print_mode`, and `as_html._CHAR_WIDTHS`'s
+#   docstring for why those are `<th width=...>` and not `<colgroup>` --
+#   `<colgroup>` was tried too and measured to have no effect at all):
+#   the description/Notes column collapses to a sliver and the table's
+#   last two headers print on top of each other. Cell padding for the
+#   print path is the HTML `cellpadding` attribute on `<table>` instead
+#   (`as_html._TABLE_OPEN`), which xhtml2pdf honours without discarding
+#   column widths.
 # - No `.identity-block span { margin-right/padding-right: ... }` rule.
 #   xhtml2pdf's box model does not apply margin OR padding to an inline
 #   `<span>` at all -- both were tried and both rendered as zero gap:

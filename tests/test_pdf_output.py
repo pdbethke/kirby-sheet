@@ -97,12 +97,16 @@ def test_extracted_text_contains_the_characters_name():
 
 @_needs_bokor
 def test_bokor_renders_in_a_sane_page_count():
-    """A regression guard for the print stylesheet, not a design spec: an
-    earlier version of `_PRINT_CSS` built cleanly (xhtml2pdf reported
-    err=0) but silently abandoned the `<colgroup>` widths under a CSS
-    `padding` rule, wrapping every power description into a one-inch-wide
-    ribbon -- Bokor came out at 21 pages. `err=0` and a nonzero byte count
-    don't prove the layout is usable; a page count does. Bokor renders at 6
+    """A regression guard for the print stylesheet, not a design spec.
+    Two separate defects each produced this same symptom in earlier
+    versions and both would have passed `err=0`-only checks: a CSS
+    `padding` rule silently abandoning the `<th width=...>` values,
+    wrapping every power description into a one-inch-wide ribbon (Bokor at
+    21 pages); and, before that was even noticed, a `<colgroup>` that
+    LOOKED like it declared column widths but is entirely inert in
+    xhtml2pdf (`test_declared_column_widths_actually_change_the_layout`
+    below guards that one directly). `err=0` and a nonzero byte count
+    don't prove the layout is usable; a page count does. Bokor renders at 4
     pages with a working stylesheet -- pinned well under that, not at the
     exact number, so a future content change to Bokor.hdc doesn't make this
     flaky."""
@@ -186,10 +190,10 @@ def test_to_html_with_no_stylesheet_is_byte_identical_to_before():
     out_explicit_none = to_html(sheet, stylesheet=None)
 
     assert out_default == out_explicit_none
-    # And no print-mode artefacts (colgroup, cellpadding) leak into the
-    # default path.
-    assert "colgroup" not in out_default
+    # And no print-mode artefacts (a `width=` attribute on a `<th>`, or
+    # `cellpadding`) leak into the default path.
     assert "cellpadding" not in out_default
+    assert 'width="' not in out_default
 
 
 def test_to_html_stylesheet_parameter_replaces_the_style_block():
@@ -199,6 +203,53 @@ def test_to_html_stylesheet_parameter_replaces_the_style_block():
 
     assert "<style>body { color: rebeccapurple; }</style>" in out
     assert "Georgia" not in out  # the default screen font is gone
+
+
+# --- the declared column widths must actually do something ---------------
+
+def test_declared_column_widths_actually_change_the_layout():
+    """A `<colgroup>` was the first thing tried for the print path's column
+    widths. It LOOKED right, it built cleanly, and it did nothing at all --
+    xhtml2pdf ignores `<colgroup>` completely, verified by rendering the
+    same table with two different declared widths and getting
+    byte-identical extracted text either way. The fix (`width=` on each
+    `<th>`, in `as_html._SECTION_WIDTHS`/`_CHAR_WIDTHS`) is only trustworthy
+    if changing the values it holds actually moves the layout -- so this
+    test does exactly that: render once with the module's real widths, once
+    with a deliberately much narrower description column, and require the
+    wrapped line count to come out different. A test that only checked "a
+    PDF came out" would have passed against the inert `<colgroup>` too;
+    this is the test that would NOT have."""
+    from kirby_sheet.formats import as_html
+
+    long_description = (
+        "This is a deliberately long power description written to test "
+        "whether the declared column width for the description column "
+        "actually changes how many lines it wraps onto in the rendered "
+        "PDF, rather than merely looking like it should."
+    )
+    entry = _entry(display=long_description)
+    sheet = _sheet(sections=(Section(name="powers", entries=(entry,)),))
+
+    def render_line_count() -> int:
+        text = _extract_text(to_pdf(sheet))
+        return text.count("\n")
+
+    wide_description_lines = render_line_count()
+
+    original_widths = as_html._SECTION_WIDTHS
+    as_html._SECTION_WIDTHS = ("45%", "45%", "10%")
+    try:
+        narrow_description_lines = render_line_count()
+    finally:
+        as_html._SECTION_WIDTHS = original_widths
+
+    # Confirm the swap is actually still in effect at the point of use, and
+    # restored afterward -- not load-bearing for the assertion below, but
+    # cheap insurance against a typo in the attribute name silently no-op'ing.
+    assert as_html._SECTION_WIDTHS == original_widths
+
+    assert narrow_description_lines > wide_description_lines
 
 
 # --- CLI ------------------------------------------------------------------

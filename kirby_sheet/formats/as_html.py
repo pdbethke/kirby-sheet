@@ -70,14 +70,17 @@ def to_html(sheet: Sheet, *, title: str | None = None,
     only caller that passes one, to swap in CSS xhtml2pdf's subset can
     render).
 
-    Passing a `stylesheet` also switches the tables to emit an explicit
-    `<colgroup>` -- xhtml2pdf (the reason a caller would pass one) has no
-    browser-grade table layout algorithm, so an unconstrained
-    `table { width: 100% }` hands most of a row's width to the narrow
-    numeric columns and squeezes long power descriptions into an
-    unreadably narrow ribbon. A browser needs no such hint, so the default
-    (no `stylesheet`) path never emits one -- that keeps this backend's own
-    output byte-identical to before this parameter existed."""
+    Passing a `stylesheet` also switches the tables to declare column
+    widths via a `width` attribute on each `<th>` -- xhtml2pdf (the reason
+    a caller would pass one) has no browser-grade table layout algorithm,
+    so an unconstrained `table { width: 100% }` hands most of a row's
+    width to the narrow numeric columns and squeezes long power
+    descriptions into an unreadably narrow ribbon. A browser needs no such
+    hint, so the default (no `stylesheet`) path never emits one -- that
+    keeps this backend's own output byte-identical to before this
+    parameter existed. (An earlier version of this used `<colgroup>`
+    instead; xhtml2pdf ignores it completely -- see `_TABLE_OPEN`'s
+    docstring.)"""
     doc_title = title if title is not None else sheet.identity.name
     style = stylesheet if stylesheet is not None else _STYLE
     print_mode = stylesheet is not None
@@ -152,46 +155,53 @@ def _identity_block(sheet: Sheet, print_mode: bool = False) -> list[str]:
 #: Column widths for the print (`xhtml2pdf`) path only -- see `to_html`'s
 #: `print_mode` note. Percentages sum to 100; Notes/description columns get
 #: the bulk of the row because that is where the long text lives.
-_CHAR_COLGROUP = (
-    "<colgroup>"
-    '<col style="width:8%">'
-    '<col style="width:12%">'
-    '<col style="width:8%">'
-    '<col style="width:10%">'
-    '<col style="width:62%">'
-    "</colgroup>"
-)
-
-_SECTION_COLGROUP = (
-    "<colgroup>"
-    '<col style="width:8%">'
-    '<col style="width:8%">'
-    '<col style="width:84%">'
-    "</colgroup>"
-)
+#:
+#: These are `width` attributes on each `<th>`, NOT a `<colgroup>`.
+#: `<colgroup>` was tried first and MEASURED inert in xhtml2pdf: rendering
+#: the same table with `<col style="width:8%">` and again with
+#: `<col style="width:45%">` (both spellings tried, `style="width:...%"`
+#: and the bare `width="...%"` attribute) produced byte-for-byte identical
+#: extracted text -- the description column wrapped at exactly the same
+#: point either way. A `width` attribute on `<th>` is what actually moves
+#: the layout; verified the same way, with the extracted text differing
+#: between two width sets. Do not reintroduce `<colgroup>` here on the
+#: assumption that it is the standard-looking way to do this -- it is
+#: standard-looking AND does nothing in this renderer.
+_CHAR_WIDTHS = ("7%", "13%", "7%", "8%", "65%")
+_SECTION_WIDTHS = ("8%", "8%", "84%")
 
 #: The print path's cell padding is an HTML `cellpadding` attribute, not a
-#: CSS `padding` rule on `td, th` -- xhtml2pdf's `<colgroup>` widths are
-#: only honoured with `cellpadding`. A CSS `padding` rule (even a single
-#: point, well short of the negative-availWidth crash `as_pdf.py` documents)
-#: makes it silently abandon the declared column widths: the Notes/
-#: description column collapses to a sliver and the last two headers of the
-#: characteristics table print on top of each other. Verified against
-#: Bokor's actual characteristics table, not a synthetic one.
+#: CSS `padding` rule on `td, th`. A CSS `padding` rule (even a single
+#: point, well short of the negative-availWidth crash `as_pdf.py`
+#: documents) makes xhtml2pdf silently abandon the declared `<th width=...>`
+#: values: the Notes/description column collapses to a sliver and the last
+#: two headers of the characteristics table print on top of each other.
+#: Verified against Bokor's actual characteristics table, not a synthetic
+#: one.
 _TABLE_OPEN = '<table cellpadding="3">'
+
+
+def _th_row(headers: tuple[str, ...], widths: tuple[str, ...] | None) -> str:
+    """One `<tr>` of `<th>` cells. `widths`, given, puts a `width=`
+    attribute on each -- the print path's mechanism for column widths (see
+    `_CHAR_WIDTHS`'s docstring for why this is `width=` on `<th>` and not
+    `<colgroup>`)."""
+    if widths is None:
+        cells = "".join(f"<th>{h}</th>" for h in headers)
+    else:
+        cells = "".join(f'<th width="{w}">{h}</th>'
+                         for h, w in zip(headers, widths))
+    return f"<tr>{cells}</tr>"
 
 
 def _characteristics(rows: tuple[CharacteristicRow, ...],
                       print_mode: bool = False) -> list[str]:
     if not rows:
         return []
-    out = [_TABLE_OPEN if print_mode else "<table>"]
-    if print_mode:
-        out.append(_CHAR_COLGROUP)
-    out.extend(["<thead>",
-           "<tr><th>Val</th><th>Char</th><th>Cost</th><th>Roll</th>"
-           "<th>Notes</th></tr>",
-           "</thead>", "<tbody>"])
+    out = [_TABLE_OPEN if print_mode else "<table>", "<thead>",
+           _th_row(("Val", "Char", "Cost", "Roll", "Notes"),
+                   _CHAR_WIDTHS if print_mode else None),
+           "</thead>", "<tbody>"]
     for row in rows:
         # `total` and `roll` are already display strings from kirby-cost --
         # printed as-is, escaped like any other value a person didn't
@@ -213,13 +223,15 @@ def _characteristics(rows: tuple[CharacteristicRow, ...],
 
 
 def _section(section: Section, print_mode: bool = False) -> list[str]:
-    out = [f"<h2>{html.escape(section.name.replace('_', ' ').title())}</h2>",
-           _TABLE_OPEN if print_mode else "<table>"]
-    if print_mode:
-        out.append(_SECTION_COLGROUP)
-    out.extend(["<thead>",
-           "<tr><th>Cost</th><th>END</th><th></th></tr>",
-           "</thead>", "<tbody>"])
+    # The text backend renders this same string as the third column's
+    # header (`Cost  END  SKILLS` etc) -- used here too, not left blank, so
+    # the column headers agree across backends instead of drifting.
+    title = section.name.replace('_', ' ').title()
+    out = [f"<h2>{html.escape(title)}</h2>",
+           _TABLE_OPEN if print_mode else "<table>", "<thead>",
+           _th_row(("Cost", "END", html.escape(title)),
+                   _SECTION_WIDTHS if print_mode else None),
+           "</thead>", "<tbody>"]
     for entry in section.entries:
         out.append(_entry_row(entry))
     out.append("</tbody>")

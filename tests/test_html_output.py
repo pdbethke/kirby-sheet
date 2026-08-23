@@ -185,6 +185,21 @@ def test_empty_sections_are_omitted():
     assert "powers" in out.lower()
 
 
+def test_section_table_third_header_names_the_section():
+    """The third column header used to be blank (`<tr><th>Cost</th>
+    <th>END</th><th></th></tr>`) -- a reader had no label for what that
+    column held. It now carries the same string as the `<h2>` heading right
+    above it (not a fresh computation of its own, so the two can't drift
+    apart), matching how the text backend already labels this column
+    (`Cost  END  SKILLS`)."""
+    sheet = _sheet(sections=(Section(name="skills", entries=(_entry(),)),))
+
+    out = to_html(sheet)
+
+    assert "<tr><th>Cost</th><th>END</th><th></th></tr>" not in out
+    assert "<tr><th>Cost</th><th>END</th><th>Skills</th></tr>" in out
+
+
 def test_entry_with_parent_id_is_marked_nested():
     """This backend's chosen mechanism: a `nested` CSS class on the <tr>."""
     parent = _entry(id="pool-id", name="Pool", display="Pool-display")
