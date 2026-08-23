@@ -236,14 +236,42 @@ def test_section_column_labels_sit_over_the_columns_they_name():
 # --- footer / identity ----------------------------------------------------
 
 def test_footer_states_the_character_s_cost():
-    totals = Totals(total_points=350.0, available_points=350.0,
+    totals = Totals(total_points=350.0, available_points=39.0,
                     base_points=300.0, complication_points=50.0,
-                    experience=25.0)
+                    experience=25.0, complications_taken=50.0,
+                    complications_shortfall=0.0, spendable_points=350.0,
+                    points_unspent=0.0)
     out = to_text(_sheet(totals=totals))
-    assert "350" in out
-    assert "300" in out
-    assert "50" in out
-    assert "25" in out
+    assert "Total Points: 300" in out
+    assert "Experience: +25" in out
+    assert "50 / 50 matching" in out
+    assert "Spendable: 350" in out
+    assert "Spent: 350" in out
+    assert "Unspent: 0" in out
+
+
+def test_footer_shows_negative_unspent_marked_over_budget():
+    """Terminal output has no colour cue to fall back on -- the word "over"
+    must be in the text itself."""
+    totals = Totals(total_points=276.0, available_points=39.0,
+                    base_points=270.0, complication_points=40.0,
+                    experience=5.0, complications_taken=40.0,
+                    complications_shortfall=0.0, spendable_points=275.0,
+                    points_unspent=-1.0)
+    out = to_text(_sheet(totals=totals))
+    assert "Unspent: -1" in out
+    assert "over" in out.lower()
+
+
+def test_footer_shortfall_explains_itself():
+    totals = Totals(total_points=200.0, available_points=0.0,
+                    base_points=270.0, complication_points=40.0,
+                    experience=5.0, complications_taken=20.0,
+                    complications_shortfall=20.0, spendable_points=255.0,
+                    points_unspent=55.0)
+    out = to_text(_sheet(totals=totals))
+    assert "20 / 40 matching" in out
+    assert "shortfall cost 20" in out.lower()
 
 
 def test_identity_block_prints_only_non_empty_fields():

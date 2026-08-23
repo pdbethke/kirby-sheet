@@ -20,7 +20,8 @@ from __future__ import annotations
 
 import html
 
-from kirby_sheet.sheet import CharacteristicRow, Entry, Prose, Section, Sheet
+from kirby_sheet.formats.totals_view import points_block_rows
+from kirby_sheet.sheet import CharacteristicRow, Entry, Prose, Section, Sheet, Totals
 
 #: (Identity attribute, its label), in the order the identity block lists
 #: them. `name` and `alternate_identities` get their own header treatment.
@@ -57,6 +58,14 @@ _STYLE = """
     .identity-block span { margin-right: 1.5rem; }
     section.prose { margin: 1rem 0; }
     section.prose h2 { margin-bottom: 0.25rem; }
+    .points-box { border: 2px solid #333; padding: 0.5rem 1rem; margin: 1rem 0;
+                  display: inline-block; }
+    .points-box h2 { margin: 0 0 0.25rem 0; }
+    .points-box table { width: auto; margin: 0; border: none; }
+    .points-box td { border: none; padding: 0.1rem 0.75rem 0.1rem 0; }
+    .points-box td.points-label { font-weight: bold; }
+    .points-box td.points-value { text-align: right; }
+    .points-box .over-budget { color: #a00; font-weight: bold; }
 """
 
 
@@ -97,6 +106,7 @@ def to_html(sheet: Sheet, *, title: str | None = None,
 
     parts.extend(_header(sheet))
     parts.extend(_identity_block(sheet, print_mode))
+    parts.extend(_points_box(sheet.totals))
     parts.extend(_characteristics(sheet.characteristics, print_mode))
 
     for section in sheet.sections:
@@ -107,7 +117,6 @@ def to_html(sheet: Sheet, *, title: str | None = None,
         parts.extend(_section(section, print_mode))
 
     parts.extend(_prose(sheet.prose))
-    parts.extend(_footer(sheet.totals))
 
     parts.append("</body>")
     parts.append("</html>")
@@ -289,14 +298,30 @@ def _escaped_paragraphs(text: str) -> str:
     return html.escape(text).replace("\n", "<br>")
 
 
-def _footer(totals) -> list[str]:
+def _points_box(totals: Totals) -> list[str]:
+    """The boxed POINTS block at the top of page 1, directly under the
+    identity line and before the characteristics table. The six rows come
+    from `totals_view.points_block_rows`, the same helper the text
+    backend's footer uses, so the two cannot disagree about the numbers or
+    the wording.
+
+    A negative "Unspent" is marked with the CSS class `over-budget` -- a
+    styling cue on top of the word "over" the shared helper already put in
+    the text itself (see that module's docstring), never the only signal.
+    """
+    rows = "".join(
+        '<tr>'
+        f'<td class="points-label">{html.escape(label)}</td>'
+        f'<td class="points-value{" over-budget" if "OVER BUDGET" in value else ""}">'
+        f'{html.escape(value)}</td>'
+        '</tr>'
+        for label, value in points_block_rows(totals)
+    )
     return [
-        '<p class="totals">'
-        f"<strong>Total:</strong> {_fmt_num(totals.total_points)} &nbsp; "
-        f"<strong>Base:</strong> {_fmt_num(totals.base_points)} &nbsp; "
-        f"<strong>Complications:</strong> {_fmt_num(totals.complication_points)} &nbsp; "
-        f"<strong>Experience:</strong> {_fmt_num(totals.experience)}"
-        "</p>"
+        '<div class="points-box">',
+        "<h2>Points</h2>",
+        f"<table>{rows}</table>",
+        "</div>",
     ]
 
 

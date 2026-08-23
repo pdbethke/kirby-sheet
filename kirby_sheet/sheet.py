@@ -104,12 +104,28 @@ class Prose:
 
 @dataclass(frozen=True)
 class Totals:
-    """The numbers at the foot of the sheet."""
+    """The numbers a totals area shows.
+
+    `available_points` is Hero Designer's own oracle-verified figure -- 5E
+    arithmetic, where Complications ADD to the spendable pool. It stays
+    exactly as kirby-cost reports it and is carried into JSON, but it is
+    NOT what a 6E sheet's POINTS block shows (see `formats/totals_view.py`).
+
+    `complications_taken`, `complications_shortfall`, `spendable_points`
+    and `points_unspent` implement the printed 6E rule instead (6E1 p.30,
+    p.269): `base_points` already includes the Matching Complications
+    target, falling short of it subtracts 1:1, and `points_unspent` is
+    deliberately unclamped -- an overspent character reads negative.
+    """
     total_points: float = 0.0
     available_points: float = 0.0
     base_points: float = 0.0
     complication_points: float = 0.0
     experience: float = 0.0
+    complications_taken: float = 0.0
+    complications_shortfall: float = 0.0
+    spendable_points: float = 0.0
+    points_unspent: float = 0.0
 
 
 @dataclass(frozen=True)

@@ -53,3 +53,35 @@ def test_non_ascii_is_not_escaped():
 def test_indent_none_produces_one_line():
     out = to_json(build_sheet(_hero()), indent=None)
     assert "\n" not in out
+
+
+# --- the 6E points fields, alongside HD's own ------------------------------
+#
+# JSON is the full record: both `available_points` (HD's 5E-style figure)
+# and `points_unspent` (the 6E figure) must be present, with their DIFFERENT
+# values -- a test that could not tell the two apart would be worthless
+# here, since a serialiser bug that dropped one and duplicated the other
+# would still show "some number" in the document.
+
+def test_totals_carries_both_hds_figure_and_the_6e_figure_distinctly():
+    doc = _doc(available_points=39.0, points_unspent=-1.0)
+    totals = doc["totals"]
+    assert totals["available_points"] == 39.0
+    assert totals["points_unspent"] == -1.0
+    assert totals["available_points"] != totals["points_unspent"]
+
+
+def test_totals_carries_every_6e_field():
+    doc = _doc(base_points=270, disad_points=40, experience=5,
+               disads_used=40, complications_shortfall=0.0,
+               spendable_points=275.0, total_points=276.0,
+               points_unspent=-1.0)
+    totals = doc["totals"]
+    assert totals["base_points"] == 270
+    assert totals["complication_points"] == 40
+    assert totals["experience"] == 5
+    assert totals["complications_taken"] == 40
+    assert totals["complications_shortfall"] == 0.0
+    assert totals["spendable_points"] == 275.0
+    assert totals["total_points"] == 276.0
+    assert totals["points_unspent"] == -1.0

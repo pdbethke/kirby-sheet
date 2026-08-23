@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 import textwrap
 
+from kirby_sheet.formats.totals_view import points_block_rows
 from kirby_sheet.sheet import Entry, Identity, Prose, Section, Sheet, Totals
 from kirby_sheet.text import plain_text
 
@@ -104,11 +105,16 @@ def _identity_block(identity: Identity, width: int) -> list[str]:
 
 
 def _footer(totals: Totals, width: int) -> list[str]:
-    """What the character costs -- the first thing a reader looks for."""
-    line = (f"Total: {_fmt_num(totals.total_points)}   "
-            f"Base: {_fmt_num(totals.base_points)}   "
-            f"Complications: {_fmt_num(totals.complication_points)}   "
-            f"Experience: {_fmt_num(totals.experience)}")
+    """What the character costs -- the first thing a reader looks for.
+
+    The six labelled numbers come from `totals_view.points_block_rows`, the
+    same helper the HTML backend's boxed POINTS block uses, so the two
+    cannot disagree about the arithmetic or the wording. Terminal output has
+    no "page 1" to put a boxed block at the top of, so this backend keeps
+    the same footer position it always has -- only the content changed.
+    """
+    line = "   ".join(f"{label}: {value}"
+                       for label, value in points_block_rows(totals))
     return ["", "-" * width, *textwrap.wrap(line, width=width)]
 
 

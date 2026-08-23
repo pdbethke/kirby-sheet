@@ -60,6 +60,10 @@ _PRINT_CSS = """
     h2 { font-size: 10pt; }
     table { width: 100%; }
     th, td { text-align: left; }
+    .points-box { border: 1pt solid #000; }
+    .points-box table { width: auto; }
+    .points-box td { padding: 1pt 10pt 1pt 2pt; }
+    .over-budget { font-weight: bold; }
 """
 
 

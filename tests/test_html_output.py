@@ -258,35 +258,139 @@ def test_totals_fractional_value_survives():
     assert "399</" not in out
 
 
-# --- totals -------------------------------------------------------------
+# --- the POINTS block: the 6E model --------------------------------------
+#
+# Bokor's real values (verified independently from the HDC file, see the
+# totals brief): 270 Total Points, +5 Experience, 40/40 Complications,
+# 275 Spendable, 276 Spent, -1 Unspent. HD would report these as 39 (its
+# 5E-style `available_points`) -- these tests must never accept that number
+# in place of the 6E one.
 
-def test_totals_appear_with_their_values():
-    totals = Totals(total_points=123.0, base_points=100.0,
-                    complication_points=25.0, experience=3.0)
-    sheet = _sheet(totals=totals)
+def _bokor_totals(**kw):
+    base = dict(total_points=276.0, available_points=39.0, base_points=270.0,
+                complication_points=40.0, experience=5.0,
+                complications_taken=40.0, complications_shortfall=0.0,
+                spendable_points=275.0, points_unspent=-1.0)
+    base.update(kw)
+    return Totals(**base)
+
+
+def test_points_block_shows_bokors_six_values():
+    out = to_html(_sheet(totals=_bokor_totals()))
+
+    assert "<h2>Points</h2>" in out
+    assert '<td class="points-label">Total Points</td><td class="points-value">270</td>' in out
+    assert '<td class="points-label">Experience</td><td class="points-value">+5</td>' in out
+    assert '<td class="points-label">Spendable</td><td class="points-value">275</td>' in out
+    assert '<td class="points-label">Spent</td><td class="points-value">276</td>' in out
+
+
+def test_unspent_is_negative_and_marked_over_budget_not_merely_a_minus_sign():
+    """A colour cue alone is invisible to --text output, pdftotext, and a
+    greyscale printout -- the word "over" must be in the extracted text."""
+    out = to_html(_sheet(totals=_bokor_totals(points_unspent=-1.0)))
+
+    row = out[out.index('<td class="points-label">Unspent</td>'):]
+    row = row[:row.index("</tr>")]
+    assert "-1" in row
+    assert "over" in row.lower()
+
+
+def test_unspent_zero_is_shown_for_an_exactly_built_character():
+    """Ravel: built exactly to the 6E pool. An omitted Unspent line would be
+    ambiguous between "complete" and "this backend dropped the field"."""
+    totals = Totals(total_points=450.0, available_points=100.0,
+                    base_points=400.0, complication_points=100.0,
+                    experience=50.0, complications_taken=100.0,
+                    complications_shortfall=0.0, spendable_points=450.0,
+                    points_unspent=0.0)
+
+    out = to_html(_sheet(totals=totals))
+
+    assert '<td class="points-label">Unspent</td><td class="points-value">0</td>' in out
+    assert "over budget" not in out.lower()
+
+
+def test_complications_read_taken_over_matching():
+    out = to_html(_sheet(totals=_bokor_totals(complications_taken=40.0,
+                                              complication_points=40.0)))
+
+    row = out[out.index('<td class="points-label">Complications</td>'):]
+    row = row[:row.index("</tr>")]
+    assert "40 / 40 matching" in row
+
+
+def test_a_shortfall_reduces_spendable_and_explains_itself():
+    """Nothing in the three real characters exercises this path -- all three
+    have zero shortfall. A dedicated stub with taken < matching is required
+    to reach it: taking only 20 of a 40-point Matching Complications target
+    costs 20 points, so Spendable (255) is 20 below Total Points (270), and
+    the Complications row says what that cost."""
+    totals = Totals(total_points=200.0, available_points=0.0,
+                    base_points=270.0, complication_points=40.0,
+                    experience=5.0, complications_taken=20.0,
+                    complications_shortfall=20.0, spendable_points=255.0,
+                    points_unspent=55.0)
+
+    out = to_html(_sheet(totals=totals))
+
+    total_points_row = out[out.index('<td class="points-label">Total Points</td>'):]
+    total_points_row = total_points_row[:total_points_row.index("</tr>")]
+    assert ">270<" in total_points_row
+
+    spendable_row = out[out.index('<td class="points-label">Spendable</td>'):]
+    spendable_row = spendable_row[:spendable_row.index("</tr>")]
+    assert ">255<" in spendable_row
+
+    complications_row = out[out.index('<td class="points-label">Complications</td>'):]
+    complications_row = complications_row[:complications_row.index("</tr>")]
+    assert "20 / 40 matching" in complications_row
+    assert "shortfall cost 20" in complications_row.lower()
+
+
+def test_excess_complications_grant_no_increase_to_spendable():
+    """taken > matching: Spendable must equal Total Points exactly (no
+    shortfall, and no bonus for the excess either) -- 44 taken against a
+    40-point target still spends against a 270-point Total Points figure,
+    not 274."""
+    totals = Totals(total_points=270.0, available_points=44.0,
+                    base_points=270.0, complication_points=40.0,
+                    experience=0.0, complications_taken=44.0,
+                    complications_shortfall=0.0, spendable_points=270.0,
+                    points_unspent=0.0)
+
+    out = to_html(_sheet(totals=totals))
+
+    spendable_row = out[out.index('<td class="points-label">Spendable</td>'):]
+    spendable_row = spendable_row[:spendable_row.index("</tr>")]
+    assert ">270<" in spendable_row
+    assert "274" not in spendable_row
+
+    complications_row = out[out.index('<td class="points-label">Complications</td>'):]
+    complications_row = complications_row[:complications_row.index("</tr>")]
+    assert "44 / 40 matching" in complications_row
+    assert "cost" not in complications_row.lower()   # no shortfall to explain
+
+
+def test_points_block_precedes_the_characteristics_table_in_document_order():
+    row = _char_row(name="A-Characteristic")
+    sheet = _sheet(characteristics=(row,), totals=_bokor_totals())
 
     out = to_html(sheet)
 
-    assert "123" in out
-    assert "100" in out
-    assert "25" in out
-    assert "3" in out
+    points_index = out.index("<h2>Points</h2>")
+    table_index = out.index("A-Characteristic")
+    assert points_index < table_index
 
 
-def test_totals_labels_are_paired_with_the_right_value():
-    """Substring presence alone ("100" in out) can't tell Base from
-    Complications apart if the two values get swapped -- pin the label and
-    its value together."""
-    totals = Totals(total_points=123.0, base_points=100.0,
-                    complication_points=25.0, experience=3.0)
-    sheet = _sheet(totals=totals)
-
-    out = to_html(sheet)
-
-    assert "<strong>Total:</strong> 123" in out
-    assert "<strong>Base:</strong> 100" in out
-    assert "<strong>Complications:</strong> 25" in out
-    assert "<strong>Experience:</strong> 3" in out
+def test_json_still_carries_hds_available_points_alongside_the_6e_figure():
+    """Not this module's job to serialise JSON, but the Totals dataclass IS
+    this module's business -- available_points must survive untouched on the
+    object the HTML backend reads from, distinct from points_unspent."""
+    totals = _bokor_totals()
+    assert totals.available_points == 39.0
+    assert totals.points_unspent == -1.0
+    assert totals.available_points != totals.points_unspent
 
 
 # --- title ----------------------------------------------------------------

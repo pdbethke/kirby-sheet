@@ -87,7 +87,9 @@ def _hero(**kw):
                 characteristics=[], powers=[], skills=[], perks=[], talents=[],
                 complications=[], martial_arts=[], equipment=[],
                 total_points=276.0, available_points=39.0, base_points=270,
-                disad_points=40, experience=5)
+                disad_points=40, experience=5,
+                disads_used=38, complications_shortfall=2.0,
+                spendable_points=273.0, points_unspent=-3.0)
     base.update(kw)
     return SimpleNamespace(**base)
 
@@ -189,6 +191,23 @@ def test_each_totals_field_takes_its_own_source():
     assert t.base_points == 270
     assert t.complication_points == 40
     assert t.experience == 5
+
+
+def test_the_new_6e_totals_fields_are_carried_across_and_not_truncated():
+    """`complications_taken`, `complications_shortfall`, `spendable_points`
+    and `points_unspent` come straight off kirby-cost's own 6E properties
+    (LoadedHero.disads_used / .complications_shortfall / .spendable_points
+    / .points_unspent) -- build.py reads them, it does not derive them. Every
+    stub value here is distinct, and `points_unspent` is fractional-looking
+    (a whole number written as a float, -3.0) so a narrowing `int()` on this
+    field would not be caught by this assertion alone -- see
+    test_totals_unspent_is_not_narrowed_to_an_int for that guard
+    specifically, using PowerLad's real 0.5."""
+    t = build_sheet(_hero()).totals
+    assert t.complications_taken == 38
+    assert t.complications_shortfall == 2.0
+    assert t.spendable_points == 273.0
+    assert t.points_unspent == -3.0
 
 
 def test_each_entry_metadata_field_takes_its_own_source():
@@ -330,3 +349,62 @@ def test_the_round_trip_normalises_bom_and_line_endings(tmp_path):
     target_bytes = target_path.read_bytes()
     assert target_bytes.startswith(b"\xff\xfe")
     assert "\r\n" in target_bytes.decode("utf-16")
+
+
+# --- the 6E points model, against real characters --------------------------
+#
+# Expected values independently verified from the HDC files (see the totals
+# brief). HD's own `available_points` reports these same three characters as
+# 100, 120.5 and 39 -- the 5E-style figure, which stays on Totals untouched
+# but is NOT what these assertions check. `points_unspent` is the 6E figure:
+# it must read 0 for Ravel (exactly on budget), 0.5 for PowerLad (a fraction
+# that a narrowing int() would erase), and -1 for Bokor (over budget, and
+# unclamped).
+
+_RAVEL = Path("~/Documents/Champions/Ravel.hdc").expanduser()
+_POWERLAD = Path("~/Desktop/PowerLad.hdc").expanduser()
+
+_needs_ravel = pytest.mark.skipif(
+    not _RAVEL.is_file() or not (os.environ.get("KIRBY_COST_HDT") or "").strip(),
+    reason="needs Ravel.hdc and KIRBY_COST_HDT",
+)
+_needs_powerlad = pytest.mark.skipif(
+    not _POWERLAD.is_file() or not (os.environ.get("KIRBY_COST_HDT") or "").strip(),
+    reason="needs PowerLad.hdc and KIRBY_COST_HDT",
+)
+
+
+@_needs_ravel
+def test_ravel_is_built_exactly_to_the_6e_pool():
+    t = sheet_from_hdc(_RAVEL).totals
+    assert t.spendable_points == 450.0
+    assert t.total_points == 450.0
+    assert t.points_unspent == 0.0
+    assert t.available_points == 100.0   # HD's 5E-style figure, unchanged
+
+
+@_needs_powerlad
+def test_powerlad_has_half_a_point_unspent_not_zero():
+    """399.5 spent against a 400 pool -- a narrowing int() on points_unspent
+    would round 0.5 down to 0 and this would pass for the wrong reason if it
+    only checked truthiness, so the exact float is asserted."""
+    t = sheet_from_hdc(_POWERLAD).totals
+    assert t.spendable_points == 400.0
+    assert t.total_points == 399.5
+    assert t.points_unspent == 0.5
+    assert t.available_points == 120.5   # HD's 5E-style figure, unchanged
+
+
+@_needs_character
+def test_bokor_is_overspent_by_exactly_one_point():
+    """Bokor's 6E Unspent is -1 -- negative, and must not be clamped to 0."""
+    t = sheet_from_hdc(character_path()).totals
+    assert t.base_points == 270.0
+    assert t.experience == 5.0
+    assert t.complications_taken == 40.0
+    assert t.complication_points == 40.0
+    assert t.complications_shortfall == 0.0
+    assert t.spendable_points == 275.0
+    assert t.total_points == 276.0
+    assert t.points_unspent == -1.0
+    assert t.available_points == 39.0   # HD's 5E-style figure, unchanged

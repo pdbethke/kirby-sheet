@@ -142,6 +142,10 @@ def _totals(hero) -> Totals:
         base_points=float(hero.base_points),
         complication_points=float(hero.disad_points),
         experience=float(hero.experience),
+        complications_taken=float(hero.disads_used),
+        complications_shortfall=float(hero.complications_shortfall),
+        spendable_points=float(hero.spendable_points),
+        points_unspent=float(hero.points_unspent),
     )
 
 

@@ -119,6 +119,38 @@ def test_bokor_renders_in_a_sane_page_count():
     assert len(reader.pages) < 10
 
 
+@_needs_bokor
+def test_bokors_points_block_reads_the_6e_figures_not_hds():
+    """PDF inherits from HTML via `to_html(stylesheet=...)` -- this is that
+    inheritance verified, not assumed. HD's own `available_points` would
+    report 39 for Bokor; if the PDF path silently fell back to it (a
+    plausible regression given the two live side by side on Totals), this
+    would still be "some number" without this exact-value check."""
+    from kirby_sheet.build import sheet_from_hdc
+
+    sheet = sheet_from_hdc(_BOKOR)
+    pdf_bytes = to_pdf(sheet)
+
+    text = _extract_text(pdf_bytes)
+    assert "Points" in text
+    assert "40 / 40 matching" in text
+    assert "275" in text     # Spendable
+    assert "276" in text     # Spent
+    assert "OVER BUDGET" in text   # Unspent -1, marked -- not just a minus sign
+
+
+@_needs_powerlad
+def test_powerlads_unspent_is_a_fraction_in_the_pdf_not_rounded():
+    from kirby_sheet.build import sheet_from_hdc
+
+    sheet = sheet_from_hdc(_POWERLAD)
+    pdf_bytes = to_pdf(sheet)
+
+    text = _extract_text(pdf_bytes)
+    assert "0.5" in text
+    assert "OVER BUDGET" not in text
+
+
 @_needs_powerlad
 def test_a_fractional_cost_survives_to_the_pdf():
     """PowerLad's Iron Grasshopper is a real 44.5-point power. A narrowing
