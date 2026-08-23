@@ -170,6 +170,55 @@ def test_hdc_flag_with_o_writes_a_file_that_reloads_with_the_same_name(tmp_path)
     assert reloaded.totals.total_points == source_sheet.totals.total_points
 
 
+# --- --inspect: a TEMPLATE, not a character -------------------------------
+
+def test_inspect_flag_needs_no_character_argument(tmp_path, capsys):
+    template = tmp_path / "t.hde"
+    template.write_text("<!--APP_VERSION--><!--CHARACTER_NAME-->")
+
+    code = main(["--inspect", str(template)])
+
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "2 tokens used" in out
+    assert "1 resolved" in out
+    assert "1 unresolved" in out
+    assert "CHARACTER_NAME" in out
+
+
+def test_inspect_flag_writes_to_a_file_with_o(tmp_path, capsys):
+    template = tmp_path / "t.hde"
+    template.write_text("<!--APP_VERSION-->")
+    out_file = tmp_path / "report.txt"
+
+    code = main(["--inspect", str(template), "-o", str(out_file)])
+
+    assert code == 0
+    assert capsys.readouterr().out == ""  # went to the file, not stdout
+    assert "1 tokens used" in out_file.read_text(encoding="utf-8")
+
+
+def test_inspect_flag_missing_template_names_the_path(tmp_path, capsys):
+    missing = tmp_path / "nope.hde"
+
+    code = main(["--inspect", str(missing)])
+
+    assert code != 0
+    err = capsys.readouterr().err
+    assert str(missing) in err
+
+
+def test_inspect_and_json_together_are_rejected(tmp_path, capsys):
+    template = tmp_path / "t.hde"
+    template.write_text("x")
+
+    code = main(["--inspect", str(template), "--json"])
+
+    assert code != 0
+    err = capsys.readouterr().err
+    assert "not allowed with" in err.lower()
+
+
 def test_cli_does_not_import_kirby_cost_directly():
     """build.py is the only module in this package permitted to import
     kirby-cost -- cli.py reaches --hdc through `copy_hdc`, not through

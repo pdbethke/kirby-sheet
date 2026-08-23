@@ -14,6 +14,11 @@ feature this package does not have yet.
 permitted to import kirby-cost) and writes a binary UTF-16 `.hdc` document,
 so it is handled separately from `_FORMATS` and requires `-o` -- there is no
 useful way to write that document to a terminal or down a text pipe.
+
+`--inspect` is not one of those either, and for the opposite reason from
+`--hdc`: it takes a TEMPLATE path instead of a character, so there is no
+character argument to load at all. It reports which tokens a `.hde`
+template uses and which the renderer resolves (`kirby_sheet.inspect`).
 """
 from __future__ import annotations
 
@@ -26,7 +31,9 @@ from kirby_sheet.build import copy_hdc, sheet_from_hdc
 from kirby_sheet.formats.as_html import to_html
 from kirby_sheet.formats.as_json import to_json
 from kirby_sheet.formats.as_text import to_text
+from kirby_sheet.inspect import describe, inspect_template
 from kirby_sheet.sheet import Sheet
+from kirby_sheet.template import Template
 
 #: format flag name -> renderer. The CLI's only knowledge of what backends
 #: exist; everything else about a format lives in its own module.
@@ -42,24 +49,70 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="kirby-sheet",
         description="Render a HERO Designer character sheet.",
     )
-    parser.add_argument("character", help="path to a .hdc character file")
-    formats = parser.add_mutually_exclusive_group(required=True)
+    # Not required here at the positional level: --inspect takes a template
+    # instead of a character, so there is nothing to require a character
+    # for in that mode. Its absence is enforced by hand in main() for every
+    # other mode.
+    parser.add_argument("character", nargs="?",
+                         help="path to a .hdc character file")
+    formats = parser.add_mutually_exclusive_group()
     for name in _FORMATS:
         formats.add_argument(f"--{name}", action="store_true",
                               help=f"write the sheet as {name.upper()}")
     formats.add_argument("--hdc", action="store_true",
                           help="write a HERO Designer .hdc file (requires -o)")
+    formats.add_argument("--inspect", metavar="TEMPLATE",
+                          help="report which tokens TEMPLATE (a .hde file) "
+                               "uses and which the renderer resolves -- "
+                               "takes a template, not a character")
     parser.add_argument("-o", "--output", metavar="FILE",
                          help="write to FILE instead of stdout (UTF-8)")
     return parser
+
+
+def _run_inspect(args: argparse.Namespace) -> int:
+    """`--inspect TEMPLATE`: report the template's tokens, not a character."""
+    template_path = Path(args.inspect)
+    if not template_path.is_file():
+        print(f"kirby-sheet: template file not found: {template_path}",
+              file=sys.stderr)
+        return 1
+
+    try:
+        template = Template.from_path(template_path)
+    except Exception as exc:
+        print(f"kirby-sheet: {exc}", file=sys.stderr)
+        return 1
+
+    document = describe(inspect_template(template))
+
+    if args.output:
+        Path(args.output).write_text(document, encoding="utf-8")
+    else:
+        sys.stdout.write(document)
+        if not document.endswith("\n"):
+            sys.stdout.write("\n")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     try:
         args = parser.parse_args(argv)
+
+        if args.inspect:
+            return _run_inspect(args)
+
+        if not args.character:
+            parser.error("the following arguments are required: character")
+
+        if not (args.hdc or any(getattr(args, name) for name in _FORMATS)):
+            parser.error("one of the arguments " +
+                         " ".join(f"--{name}" for name in _FORMATS) +
+                         " --hdc --inspect is required")
     except SystemExit as exc:
-        # argparse has already written usage/the error to stderr; convert its
+        # argparse has already written usage/the error to stderr (whether
+        # from parse_args itself or from parser.error() above); convert its
         # exit into a return so main() never raises for ordinary bad usage.
         return exc.code if isinstance(exc.code, int) else 2
 
