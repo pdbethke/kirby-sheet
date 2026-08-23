@@ -46,6 +46,26 @@ Tests that need Hero Designer skip when it is absent:
 | `KIRBY_SHEET_HDC` | a `.hdc` character |
 | `KIRBY_SHEET_ORACLE` | `hd6cli.sh` from kirby-hd-oracle |
 
+## Where this is going
+
+This is one of three engines behind [Kirby](https://kirbyvtt.org), a virtual
+tabletop for the HERO System:
+
+- **[kirby-cost](https://github.com/pdbethke/kirby-cost)** — reads a HERO 6E
+  build and costs it, validated against Hero Designer
+- **[kirby-sheet](https://github.com/pdbethke/kirby-sheet)** — renders a
+  character to JSON, text, HTML, PDF, or back to `.hdc`
+- **[kirby-combat](https://github.com/pdbethke/kirby-combat)** — the combat
+  engine: attacks, movement, mental combat, vehicles, mass combat,
+  destructible terrain
+
+What's still to come is the table itself — terrain with its own PD and ED,
+elevation and concealment that move OCV and DCV, and line of sight worked out
+from where a character is actually standing. Kirby plays characters; it does
+not create them. Character creation stays in Hero Designer.
+
+Progress and notes at [kirbyvtt.org](https://kirbyvtt.org).
+
 ## Provenance
 
 **This is a port of licensed source code, purchased from Hero Games** — the
