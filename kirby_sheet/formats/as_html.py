@@ -60,9 +60,27 @@ _STYLE = """
 """
 
 
-def to_html(sheet: Sheet, *, title: str | None = None) -> str:
-    """The sheet, as a complete standalone HTML document."""
+def to_html(sheet: Sheet, *, title: str | None = None,
+            stylesheet: str | None = None) -> str:
+    """The sheet, as a complete standalone HTML document.
+
+    `stylesheet`, when given, REPLACES the contents of the `<style>` block
+    outright -- it is not merged with `_STYLE`. Omitted, behaviour is
+    exactly as before this parameter existed (the `as_pdf` backend is the
+    only caller that passes one, to swap in CSS xhtml2pdf's subset can
+    render).
+
+    Passing a `stylesheet` also switches the tables to emit an explicit
+    `<colgroup>` -- xhtml2pdf (the reason a caller would pass one) has no
+    browser-grade table layout algorithm, so an unconstrained
+    `table { width: 100% }` hands most of a row's width to the narrow
+    numeric columns and squeezes long power descriptions into an
+    unreadably narrow ribbon. A browser needs no such hint, so the default
+    (no `stylesheet`) path never emits one -- that keeps this backend's own
+    output byte-identical to before this parameter existed."""
     doc_title = title if title is not None else sheet.identity.name
+    style = stylesheet if stylesheet is not None else _STYLE
+    print_mode = stylesheet is not None
 
     parts: list[str] = []
     parts.append("<!DOCTYPE html>")
@@ -70,20 +88,20 @@ def to_html(sheet: Sheet, *, title: str | None = None) -> str:
     parts.append("<head>")
     parts.append('<meta charset="utf-8">')
     parts.append(f"<title>{html.escape(doc_title)}</title>")
-    parts.append(f"<style>{_STYLE}</style>")
+    parts.append(f"<style>{style}</style>")
     parts.append("</head>")
     parts.append("<body>")
 
     parts.extend(_header(sheet))
-    parts.extend(_identity_block(sheet))
-    parts.extend(_characteristics(sheet.characteristics))
+    parts.extend(_identity_block(sheet, print_mode))
+    parts.extend(_characteristics(sheet.characteristics, print_mode))
 
     for section in sheet.sections:
         if not section.entries:
             # An empty section heading tells a reader nothing a blank line
             # wouldn't -- omit it entirely, as the text backend does.
             continue
-        parts.extend(_section(section))
+        parts.extend(_section(section, print_mode))
 
     parts.extend(_prose(sheet.prose))
     parts.extend(_footer(sheet.totals))
@@ -102,7 +120,18 @@ def _header(sheet: Sheet) -> list[str]:
     return out
 
 
-def _identity_block(sheet: Sheet) -> list[str]:
+#: A visible gap between adjacent identity-block `<span>`s, for the print
+#: path only. The screen stylesheet's `.identity-block span { margin-right:
+#: 1.5rem; }` gives a browser that gap for free; xhtml2pdf's box model does
+#: not honour margin (or padding) on an inline `<span>` at all -- verified
+#: against Bokor's actual identity line, which without this ran together as
+#: "Player: Peter BethkeHair: BaldEyes: Brown..." with zero pixels of
+#: separation. Three non-breaking spaces, joined between fields (not
+#: trailing on the last one), is what xhtml2pdf does honour.
+_PRINT_FIELD_GAP = "\xa0\xa0\xa0"
+
+
+def _identity_block(sheet: Sheet, print_mode: bool = False) -> list[str]:
     identity = sheet.identity
     fields = [f"<span><strong>{label}:</strong> {html.escape(str(value))}</span>"
               for attr, label in _IDENTITY_FIELDS
@@ -116,16 +145,53 @@ def _identity_block(sheet: Sheet) -> list[str]:
 
     if not fields:
         return []
-    return ['<p class="identity-block">' + "".join(fields) + "</p>"]
+    joiner = _PRINT_FIELD_GAP if print_mode else ""
+    return ['<p class="identity-block">' + joiner.join(fields) + "</p>"]
 
 
-def _characteristics(rows: tuple[CharacteristicRow, ...]) -> list[str]:
+#: Column widths for the print (`xhtml2pdf`) path only -- see `to_html`'s
+#: `print_mode` note. Percentages sum to 100; Notes/description columns get
+#: the bulk of the row because that is where the long text lives.
+_CHAR_COLGROUP = (
+    "<colgroup>"
+    '<col style="width:8%">'
+    '<col style="width:12%">'
+    '<col style="width:8%">'
+    '<col style="width:10%">'
+    '<col style="width:62%">'
+    "</colgroup>"
+)
+
+_SECTION_COLGROUP = (
+    "<colgroup>"
+    '<col style="width:8%">'
+    '<col style="width:8%">'
+    '<col style="width:84%">'
+    "</colgroup>"
+)
+
+#: The print path's cell padding is an HTML `cellpadding` attribute, not a
+#: CSS `padding` rule on `td, th` -- xhtml2pdf's `<colgroup>` widths are
+#: only honoured with `cellpadding`. A CSS `padding` rule (even a single
+#: point, well short of the negative-availWidth crash `as_pdf.py` documents)
+#: makes it silently abandon the declared column widths: the Notes/
+#: description column collapses to a sliver and the last two headers of the
+#: characteristics table print on top of each other. Verified against
+#: Bokor's actual characteristics table, not a synthetic one.
+_TABLE_OPEN = '<table cellpadding="3">'
+
+
+def _characteristics(rows: tuple[CharacteristicRow, ...],
+                      print_mode: bool = False) -> list[str]:
     if not rows:
         return []
-    out = ["<table>", "<thead>",
+    out = [_TABLE_OPEN if print_mode else "<table>"]
+    if print_mode:
+        out.append(_CHAR_COLGROUP)
+    out.extend(["<thead>",
            "<tr><th>Val</th><th>Char</th><th>Cost</th><th>Roll</th>"
            "<th>Notes</th></tr>",
-           "</thead>", "<tbody>"]
+           "</thead>", "<tbody>"])
     for row in rows:
         # `total` and `roll` are already display strings from kirby-cost --
         # printed as-is, escaped like any other value a person didn't
@@ -146,11 +212,14 @@ def _characteristics(rows: tuple[CharacteristicRow, ...]) -> list[str]:
     return out
 
 
-def _section(section: Section) -> list[str]:
+def _section(section: Section, print_mode: bool = False) -> list[str]:
     out = [f"<h2>{html.escape(section.name.replace('_', ' ').title())}</h2>",
-           "<table>", "<thead>",
+           _TABLE_OPEN if print_mode else "<table>"]
+    if print_mode:
+        out.append(_SECTION_COLGROUP)
+    out.extend(["<thead>",
            "<tr><th>Cost</th><th>END</th><th></th></tr>",
-           "</thead>", "<tbody>"]
+           "</thead>", "<tbody>"])
     for entry in section.entries:
         out.append(_entry_row(entry))
     out.append("</tbody>")

@@ -15,6 +15,11 @@ permitted to import kirby-cost) and writes a binary UTF-16 `.hdc` document,
 so it is handled separately from `_FORMATS` and requires `-o` -- there is no
 useful way to write that document to a terminal or down a text pipe.
 
+`--pdf` is handled the same way as `--hdc`, for the same reason: `to_pdf`
+returns `bytes`, not `str` -- `_FORMATS` is typed `Callable[[Sheet], str]`
+-- and a PDF written down a terminal or a text pipe is as useless as a
+`.hdc` file would be. It requires `-o` for that reason too.
+
 `--inspect` is not one of those either, and for the opposite reason from
 `--hdc`: it takes a TEMPLATE path instead of a character, so there is no
 character argument to load at all. It reports which tokens a `.hde`
@@ -30,6 +35,7 @@ from typing import Callable
 from kirby_sheet.build import copy_hdc, sheet_from_hdc
 from kirby_sheet.formats.as_html import to_html
 from kirby_sheet.formats.as_json import to_json
+from kirby_sheet.formats.as_pdf import to_pdf
 from kirby_sheet.formats.as_text import to_text
 from kirby_sheet.inspect import describe, inspect_template
 from kirby_sheet.sheet import Sheet
@@ -61,6 +67,8 @@ def _build_parser() -> argparse.ArgumentParser:
                               help=f"write the sheet as {name.upper()}")
     formats.add_argument("--hdc", action="store_true",
                           help="write a HERO Designer .hdc file (requires -o)")
+    formats.add_argument("--pdf", action="store_true",
+                          help="write the sheet as a PDF (requires -o)")
     formats.add_argument("--inspect", metavar="TEMPLATE",
                           help="report which tokens TEMPLATE (a .hde file) "
                                "uses and which the renderer resolves -- "
@@ -109,10 +117,10 @@ def main(argv: list[str] | None = None) -> int:
         if not args.character:
             parser.error("the following arguments are required: character")
 
-        if not (args.hdc or any(getattr(args, name) for name in _FORMATS)):
+        if not (args.hdc or args.pdf or any(getattr(args, name) for name in _FORMATS)):
             parser.error("one of the arguments " +
                          " ".join(f"--{name}" for name in _FORMATS) +
-                         " --hdc --inspect is required")
+                         " --hdc --pdf --inspect is required")
     except SystemExit as exc:
         # argparse has already written usage/the error to stderr (whether
         # from parse_args itself or from parser.error() above); convert its
@@ -140,6 +148,23 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as exc:
             print(f"kirby-sheet: {exc}", file=sys.stderr)
             return 1
+        return 0
+
+    if args.pdf:
+        if not args.output:
+            print("kirby-sheet: --pdf requires -o FILE "
+                  "(a PDF is binary; writing it to stdout is not useful)",
+                  file=sys.stderr)
+            return 2
+        try:
+            # sheet_from_hdc is the only function that touches kirby-cost,
+            # same as the _FORMATS path below -- to_pdf itself never does.
+            sheet = sheet_from_hdc(character_path)
+            document = to_pdf(sheet)
+        except Exception as exc:
+            print(f"kirby-sheet: {exc}", file=sys.stderr)
+            return 1
+        Path(args.output).write_bytes(document)
         return 0
 
     format_name = next(name for name in _FORMATS if getattr(args, name))
