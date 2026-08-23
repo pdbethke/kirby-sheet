@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/kirby-vtt.jpg" alt="Kirby VTT — a comic panel in the Kirby style: a caped, armoured figure lettered KV bursting forward through exploding stars and crackling energy." width="900">
+</p>
+
 # kirby-sheet
 
 Render a HERO Designer character through HD's own `.hde` export templates —
