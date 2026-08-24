@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from kirby_cost.objects.characteristics.physical_defense import PhysicalDefense
 from kirby_cost.objects.characteristics.strength import Strength
-from kirby_cost.util.rounder import round_half_up, round_up
+from kirby_cost.util.rounder import round_down, round_half_up, round_up
 
 from kirby_sheet.engine import get_long_value, swap_value
 
@@ -29,7 +29,7 @@ BLOCKS = (
     ("EGO", "EGO"), ("PRE", "PRE"), ("OCV_CHAR", "OCV"), ("DCV_CHAR", "DCV"),
     ("OMCV", "OMCV"), ("DMCV", "DMCV"), ("SPD", "SPD"), ("PD", "PD"),
     ("ED", "ED"), ("REC", "REC"), ("END", "END"), ("BODY", "BODY"),
-    ("STUN", "STUN"),
+    ("STUN", "STUN"), ("LEAPING", "LEAPING"),
 )
 
 
@@ -62,6 +62,8 @@ def _one_characteristic(text: str, token: str, ch, hero) -> str:
             rendered = _strength(rendered, token, ch, hero)
         elif token in ("PD", "ED"):
             rendered = _defense(rendered, token, ch, hero)
+        elif token == "LEAPING":
+            rendered = _leaping(rendered, token, ch, hero)
         text = swap_value(original, rendered, text)
 
 
@@ -145,3 +147,55 @@ def _defense(body: str, token: str, ch, hero) -> str:
     body = swap_value(f"<!--{token}_RESISTANT_TOTAL-->", resistant, body)
     body = swap_value(f"<!--{token}_RESISTANT_PRIMARY-->", str(res1), body)
     return swap_value(f"<!--{token}_RESISTANT_SECONDARY-->", str(res2), body)
+
+
+def _leaping(body: str, token: str, ch, hero) -> str:
+    """The LEAPING block's horizontal/vertical totals (HTMLWriter.java:1806-1890).
+
+    Distinct from the `<!--IF_LEAPING-->` block that `movement.py` renders:
+    that one carries the non-combat total, this one the forward and upward
+    distances. Both appear in the shipped 6E template.
+
+    The half-metre rendering is Java's and is not a rounding convention any
+    stdlib function reproduces: a fraction above .75 rounds UP, above .25
+    becomes " 1/2", and anything else rounds DOWN. So 4.8 is "5m", 4.5 is
+    "4 1/2m", and 4.1 is "4m".
+    """
+    from kirby_cost.objects.characteristics.leaping import Leaping
+
+    forward = Leaping.get_primary_forward(ch, hero)
+    upward = Leaping.get_primary_upward(ch, hero)
+    sec_forward = Leaping.get_secondary_forward(ch, hero)
+    sec_upward = Leaping.get_secondary_upward(ch, hero)
+
+    p_for, p_up = _distance(forward), _distance(upward)
+    s_for, s_up = _distance(sec_forward), _distance(sec_upward)
+
+    primary = p_up if forward == upward else f"{p_for}/{p_up}"
+    secondary = s_up if sec_forward == sec_upward else f"{s_for}/{s_up}"
+    up = p_up if upward == sec_upward else f"{p_up}/{s_up}"
+    across = p_for if forward == sec_forward else f"{p_for}/{s_for}"
+
+    base = ch.get_base_value(hero)
+    for tag, value in (
+        ("PRIMARY", primary),
+        ("SECONDARY", secondary),
+        ("PRIMARY_NUMBER", str(round_half_up(forward))),
+        ("SECONDARY_NUMBER", str(round_half_up(sec_forward))),
+        ("HORIZONTAL_BASE", f"{round_half_up(base)}m"),
+        ("HORIZONTAL_TOTAL", across),
+        ("VERTICAL_BASE", f"{round_half_up(base / 2)}m"),
+        ("VERTICAL_TOTAL", up),
+    ):
+        body = swap_value(f"<!--{token}_{tag}-->", value, body)
+    return body
+
+
+def _distance(value: float) -> str:
+    """Java's half-metre rendering (HTMLWriter.java:1810-1818)."""
+    fraction = value - round_down(value)
+    if fraction > 0.75:
+        return f"{round_up(value)}m"
+    if fraction > 0.25:
+        return f"{round_down(value)} 1/2m"
+    return f"{round_down(value)}m"

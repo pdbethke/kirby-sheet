@@ -15,7 +15,7 @@ itself cannot be pinned.
 from __future__ import annotations
 
 from kirby_sheet.engine import swap_all_long_values, swap_value
-from kirby_sheet.hde import characteristics, derived, scalars
+from kirby_sheet.hde import characteristics, derived, movement, scalars
 from kirby_sheet.template import Template
 
 
@@ -44,4 +44,5 @@ def generate(template: Template, hero, *, app_version: str, timestamp: str,
     text = scalars.apply(text, hero)
     text = characteristics.apply(text, hero)
     text = derived.apply(text, hero)
+    text = movement.apply(text, hero)
     return text
