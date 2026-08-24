@@ -12,14 +12,24 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-#: variable -> what it should name. KIRBY_SHEET_HDE arrived with the full
-#: .hde backend: the opening milestone's gate rendered the bundled
-#: minimal.hde, but the byte-fidelity gate now targets a real shipped
-#: template, which this project does not ship and must be pointed at.
+#: variable -> what it should name.
+#:
+#: EVERY ONE OF THESE COMES FROM THE USER'S OWN HERO DESIGNER INSTALLATION,
+#: never from this repository or a sibling checkout. `pdf_format_6.hde` ships
+#: WITH Hero Designer, so anyone who owns HD already has it -- but its path is
+#: theirs, not ours, and this project neither bundles it nor guesses at it.
+#: The same is true of the .hdt template kirby-cost needs (KIRBY_COST_HDT) and
+#: of any character file.
+#:
+#: KIRBY_SHEET_HDE arrived with the full .hde backend: the opening milestone's
+#: gate rendered the hand-written minimal.hde in tests/fixtures, which IS ours
+#: and is the only template this repo carries. The byte-fidelity gate targets
+#: a real shipped template instead, and must be pointed at one.
 INPUTS = {
-    "KIRBY_SHEET_HDC": "a .hdc character to render",
+    "KIRBY_SHEET_HDC": "a .hdc character, from your own HERO Designer files",
     "KIRBY_SHEET_ORACLE": "the hd6cli.sh wrapper from kirby-hd-oracle",
-    "KIRBY_SHEET_HDE": "the .hde export template to render (pdf_format_6.hde)",
+    "KIRBY_SHEET_HDE": ("a .hde export template from your own HERO Designer "
+                        "installation (pdf_format_6.hde ships with it)"),
 }
 
 
