@@ -125,10 +125,6 @@ def _framework_flags(block: str, obj) -> str:
     return items._conditional(block, "IS_VPP", isinstance(obj, VariablePowerPool))
 
 
-def _sensory(block: str, obj) -> str:
-    return items._conditional(block, "IF_SENSORY",
-                              bool(getattr(obj, "is_sensory", False)))
-
 
 def _column3(obj) -> str:
     """The END column (``getColumn3Output``, GenericObject.java:1526).
@@ -188,10 +184,11 @@ def _equipment_extras(block: str, obj, hero) -> str:
     block = _framework_flags(block, obj)
     block = swap_value("<!--TEXT-->", _text_for(obj), block)
     block = swap_value("<!--EQUIPMENT_END-->", _column3(obj), block)
-    return swap_value("<!--EQUIPMENT_COST-->", _column1(obj, hero), block)
+    return swap_value("<!--EQUIPMENT_COST-->",
+                      _column1(obj, hero, equipment=True), block)
 
 
-def _column1(obj, hero) -> str:
+def _column1(obj, hero, *, equipment: bool = False) -> str:
     """``getColumn1Output`` (GenericObject.java:1477).
 
     The real cost, except for equipment carrying a price, which prints money
@@ -199,10 +196,39 @@ def _column1(obj, hero) -> str:
     that sits beside `EQUIPMENTALLOWED` in the RULES element.
     """
     from kirby_cost.util.rounder import round_up
+    if equipment:
+        # EQUIPMENT DOES NOT PRINT A POINT COST. GenericObject.java:1477-1495:
+        # a piece of equipment with a price prints that price in the campaign's
+        # money units, and one WITHOUT a price prints NOTHING at all. It never
+        # prints its real cost -- equipment is bought with money, not points,
+        # which is the whole reason the section exists.
+        #
+        # `_is_equipment` on the object is not consulted because the loader
+        # never sets it (see the note on XMLAttr("PRICE") in kirby-cost's
+        # base.py). The SECTION is the fact: this is the equipment renderer.
+        price = float(_read(obj, "price", 0) or 0)
+        value = _money(price, hero) if price else ""
+        return value + _column1_suffix(obj)
     value = _read(obj, "column1_output")
     if not value:
         value = str(round_up(_read(obj, "real_cost", 0) or 0))
     return str(value) + _column1_suffix(obj)
+
+
+def _money(price: float, hero) -> str:
+    """A priced item's cost in the campaign's units (GenericObject.java:1479-1492).
+
+    UNEXERCISED by the corpus: every HSEG item carries PRICE="0.0", so the
+    branch above takes the empty path and this is never reached. It is written
+    from the Java rather than left to raise, but it has never been compared
+    against Hero Designer and should not be trusted until it has been.
+    """
+    attrs = getattr(hero, "rules_attrs", None) or {}
+    places = int(attrs.get("EQUIPMENTCOSTDECIMALPLACES", 0) or 0)
+    units = attrs.get("EQUIPMENTCOSTUNITS", "$")
+    rendered = f"{price:.{places}f}"
+    prefix = str(attrs.get("EQUIPMENTUNITSPREFIX", "Yes")).upper().startswith("Y")
+    return f"{units}{rendered}" if prefix else f"{rendered}{units}"
 
 
 def _column1_suffix(obj) -> str:

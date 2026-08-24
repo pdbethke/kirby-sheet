@@ -339,16 +339,25 @@ def test_the_round_tripped_character_reloads_unchanged(tmp_path):
 
 @_needs_character
 def test_the_round_trip_normalises_bom_and_line_endings(tmp_path):
-    """These two differences are deliberate and documented in kirby-cost.
-    Pinning them here means a future change to that behaviour surfaces as a
-    failing test rather than as a silent difference in someone's file."""
+    """The round trip PRESERVES the source's encoding and uses CRLF.
+
+    This used to assert a UTF-16 BOM unconditionally, which held only because
+    every character it had been pointed at was UTF-16. Hero Designer writes
+    both: the authored characters are UTF-16 and the published packs are
+    UTF-8, and `copy_hdc` keeps whichever it was given. Asserting one made the
+    test fail on a UTF-8 character for a difference that is correct.
+    """
     target_path = tmp_path / "roundtrip.hdc"
+    source_bytes = character_path().read_bytes()
 
     copy_hdc(character_path(), target_path)
 
     target_bytes = target_path.read_bytes()
-    assert target_bytes.startswith(b"\xff\xfe")
-    assert "\r\n" in target_bytes.decode("utf-16")
+    source_is_utf16 = source_bytes[:2] in (b"\xff\xfe", b"\xfe\xff")
+    assert (target_bytes[:2] in (b"\xff\xfe", b"\xfe\xff")) == source_is_utf16, (
+        "the round trip changed the file's encoding")
+    text = target_bytes.decode("utf-16" if source_is_utf16 else "utf-8")
+    assert "\r\n" in text
 
 
 # --- the 6E points model, against real characters --------------------------

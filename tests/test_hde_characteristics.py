@@ -74,9 +74,11 @@ def test_a_characteristics_own_tokens_stay_inside_its_block():
     """STR_LIFT and STR_END live in the STR block. If block boundaries were
     wrong they could leak into a neighbouring characteristic's lines, which
     would still look like plausible output."""
-    ours, _ = both(KEYS)
+    ours, theirs = both(KEYS)
     assert _value(ours["str_lift"]), "str_lift rendered empty"
     assert "<!--" not in _value(ours["str_lift"]), "str_lift left a marker"
-    # Bokor's STR 15 rolls 12- and DEX 18 rolls 13-: different characteristics,
-    # different rolls. Equal values would mean ROLL resolved outside its block.
-    assert _value(ours["dex_roll"]) != _value(ours["str_roll"])
+    # Compared against HD, not asserted distinct. Two characteristics CAN
+    # legitimately roll the same -- the Lawman's STR and DEX are both 10 --
+    # and demanding otherwise was a fact about Bokor, not about the renderer.
+    assert _value(ours["dex_roll"]) == _value(theirs["dex_roll"])
+    assert _value(ours["str_roll"]) == _value(theirs["str_roll"])

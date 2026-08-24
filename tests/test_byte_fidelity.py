@@ -117,6 +117,18 @@ def test_no_marker_survives_in_the_shipped_template():
     assert leaked == [], f"unresolved tokens: {leaked}"
 
 
+#: Byte fidelity is proven for: Bokor (Heroic6E), Ravel and Power Lad
+#: (Superheroic6E), and "Lawman (Armed)" -- the last because the three
+#: authored characters carry NO EQUIPMENT, so nothing else exercises
+#: getEquipmentString beyond rendering it empty. Point KIRBY_SHEET_HDC at an
+#: equipment-bearing character to exercise that section.
+#:
+#: KNOWN GAP, one key, on a hand-built character only: a power whose options
+#: are SENSE GROUPS declared by GROUPCOST/SENSECOST rather than
+#: TARGETINGCOST -- ADJACENTFIXED is the one to hand -- gets no synthetic
+#: options from hdt_provider._sense_group_options, so its OPTION prints
+#: empty where HD prints "Sight Group". None of the four characters above
+#: has one; "Ravel (CSI Kit)" does.
 @_needs_template
 def test_the_shipped_6e_template_is_byte_identical():
     """The whole point of the backend.
