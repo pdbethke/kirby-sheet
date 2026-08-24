@@ -125,11 +125,14 @@ def _column3(obj) -> str:
     classes in kirby-cost define column3_output at all, and Power is not among
     them, so this computes it from end_usage the way Java's base class does.
     """
-    value = _read(obj, "column3_output")
-    if value:
-        return str(value)
+    # If the object HAS column3_output, its answer stands -- including when
+    # that answer is EMPTY. A `if value:` fallback treated a legitimate blank
+    # as "no answer" and substituted "0", which is exactly what a List
+    # container and a Characteristic must NOT print.
+    if hasattr(obj, "column3_output"):
+        return str(_read(obj, "column3_output"))
     usage = _read(obj, "end_usage", 0) or 0
-    return str(usage) if usage > 0 else "0"
+    return str(usage) if usage > 0 else ""
 
 
 def _power_extras(block: str, obj, hero) -> str:
