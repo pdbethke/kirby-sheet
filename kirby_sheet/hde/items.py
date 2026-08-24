@@ -17,6 +17,23 @@ from kirby_cost.util.rounder import round_up
 from kirby_sheet.engine import get_long_value, swap_long_value, swap_value
 
 
+def _read(obj, attribute: str, default=""):
+    """An attribute's value, calling it when kirby-cost exposes it as a method.
+
+    The engine is inconsistent about this -- `display` is a property on one
+    class and a zero-argument method on another -- and passing a bound method
+    into swap_value fails with "can only concatenate str (not method)". Java
+    has no such split: every one of these is a getter.
+    """
+    value = getattr(obj, attribute, default)
+    if callable(value):
+        try:
+            value = value()
+        except TypeError:
+            return default
+    return default if value is None else value
+
+
 def apply(block: str, obj) -> str:
     """Resolve one item's generic tokens within its block."""
     block = _conditional(block, "IFNAME", _is_named(obj))
@@ -24,21 +41,23 @@ def apply(block: str, obj) -> str:
     block = _conditional(block, "IS_LIST", _is_named_list(obj))
     block = _conditional(block, "IS_NOT_LIST", not _is_list(obj))
     block = _conditional(block, "IS_NOT_SEPARATOR", not _is_separator(obj))
+    block = _list_item(block, obj)
 
     option = getattr(obj, "selected_option", None)
     for tag, value in (
-        ("NAME", getattr(obj, "name", "") or ""),
-        ("XMLID", getattr(obj, "xmlid", "") or ""),
-        ("LEVELS", str(getattr(obj, "levels", 0) or 0)),
-        ("DISPLAY", getattr(obj, "display", "") or ""),
-        ("INPUT", getattr(obj, "input", "") or ""),
-        ("ALIAS", getattr(obj, "alias", "") or ""),
+        ("NAME", _read(obj, "name")),
+        ("XMLID", _read(obj, "xmlid")),
+        ("LEVELS", str(_read(obj, "levels", 0) or 0)),
+        ("DISPLAY", _display(obj)),
+        ("INPUT", _read(obj, "input")),
+        ("ALIAS", _read(obj, "alias")),
         ("TEXT", _text(obj)),
         ("NOTES", _notes(obj)),
-        ("OPTION", getattr(option, "display", "") or "" if option else ""),
-        ("OPTION_ALIAS", getattr(option, "alias", "") or "" if option else ""),
-        ("OPTION_ID", getattr(option, "xmlid", "") or "" if option else ""),
-        ("ACTIVE_COST", str(round_up(getattr(obj, "active_cost", 0) or 0))),
+        ("OPTION", _read(option, "display") if option else ""),
+        ("OPTION_ALIAS", _read(option, "alias") if option else ""),
+        ("OPTION_ID", _read(option, "xmlid") if option else ""),
+        ("ACTIVE_COST", str(round_up(_read(obj, "active_cost", 0) or 0))),
+        ("COST", str(round_up(_read(obj, "real_cost", 0) or 0))),
     ):
         block = swap_value(f"<!--{tag}-->", value, block)
     return block
@@ -60,7 +79,7 @@ def _conditional(block: str, tag: str, keep: bool) -> str:
 
 def _is_named(obj) -> bool:
     """Java tests `getName().trim().length() > 0` -- whitespace is unnamed."""
-    return bool((getattr(obj, "name", "") or "").strip())
+    return bool((_read(obj, "name")).strip())
 
 
 def _is_list(obj) -> bool:
@@ -70,19 +89,19 @@ def _is_list(obj) -> bool:
 
 def _is_named_list(obj) -> bool:
     """IS_LIST: a List container that has an alias (HTMLWriter.java:4108)."""
-    return _is_list(obj) and bool((getattr(obj, "alias", "") or "").strip())
+    return _is_list(obj) and bool((_read(obj, "alias")).strip())
 
 
 def _is_separator(obj) -> bool:
     """IS_SEPARATOR: a List container with a BLANK alias -- a bare rule
     between rows rather than a named group (HTMLWriter.java:4142)."""
-    return _is_list(obj) and not (getattr(obj, "alias", "") or "").strip()
+    return _is_list(obj) and not (_read(obj, "alias")).strip()
 
 
 def _text(obj) -> str:
     """TEXT is the nameless column-2 output, plus the parent list's suffix
     when the object hangs off one (HTMLWriter.java:4237-4240)."""
-    text = getattr(obj, "nameless_column2_output", "") or ""
+    text = _read(obj, "nameless_column2_output")
     parent = getattr(obj, "parent", None)
     if parent is not None and hasattr(parent, "column2_suffix"):
         text += parent.column2_suffix(obj)
@@ -93,8 +112,51 @@ def _notes(obj) -> str:
     """HTMLWriter.java:4284-4291. Notes when the object asks for them,
     otherwise a quantity marker, otherwise nothing."""
     if getattr(obj, "include_notes_in_printout", False):
-        return getattr(obj, "output_notes", None) or getattr(obj, "notes", "") or ""
+        return _read(obj, "output_notes") or _read(obj, "notes")
     quantity = getattr(obj, "quantity", 1) or 1
     if quantity > 1:
         return f"(x{quantity} number of items)"
     return ""
+
+
+def _list_item(block: str, obj) -> str:
+    """IS_LIST_ITEM / IFLIST and their LISTPREFIX (HTMLWriter.java:4174-4210).
+
+    An object hanging off a List or an Enhancer keeps the block and gets the
+    parent's column-2 prefix; anything else has it stripped. The enhancer
+    takes precedence over the parent list, which is Java's order.
+    """
+    parent = getattr(obj, "enhancer_applied", None) or getattr(obj, "parent", None)
+    for tag in ("IS_LIST_ITEM", "IFLIST"):
+        open_tag, close_tag = f"<!--{tag}-->", f"<!--/{tag}-->"
+        while True:
+            body = get_long_value(open_tag, close_tag, block)
+            if body is None:
+                break
+            if parent is not None and hasattr(parent, "column2_prefix"):
+                body = swap_value("<!--LISTPREFIX-->",
+                                  parent.column2_prefix(obj), body)
+                block = swap_long_value(open_tag, close_tag, body, block)
+            else:
+                block = swap_long_value(open_tag, close_tag, "", block)
+    return _conditional(block, "IS_NOT_LIST_ITEM", parent is None)
+
+
+def _display(obj) -> str:
+    """HD's DISPLAY token -- the object's TYPE, not the name its owner gave it.
+
+    `GenericObject.getDisplay()` (GenericObject.java:1631) returns the display
+    string the template supplied. kirby-cost overwrites `display` with the
+    object's NAME whenever it has one, so a power called "Mojo Hand" reports
+    "Mojo Hand" where HD reports "Hand-To-Hand Attack".
+
+    The alias is the type in that case. It is NOT a blanket substitute: three
+    of Bokor's objects have an empty name and a display that differs from
+    their alias (PS is aliased "PS" but displays "Professional Skill"), and
+    for those the unpolluted `display` is the right answer. So the name is
+    what selects between them.
+    """
+    name = str(_read(obj, "name")).strip()
+    if name and str(_read(obj, "display")).strip() == name:
+        return _read(obj, "alias")
+    return _read(obj, "display")
