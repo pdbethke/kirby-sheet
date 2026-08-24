@@ -53,8 +53,14 @@ def _ours_and_theirs():
 #:     where HD reports a value (and the reverse). getEndUsage consults the
 #:     PARENT list's modifiers (GenericObject.java:1782-1795); this port
 #:     reads the slot's own end_usage.
-#:  3. `option` -- HD reports the option's own label ("A large group") where
-#:     we report the character's input ("Home City").
+#:  3. `option` -- HD prints the option's template DISPLAY, we print its
+#:     ALIAS. Main6E declares
+#:     `<OPTION XMLID="VERYCOMMON" DISPLAY="Very Common" ALIAS="(Very Common">`
+#:     so we emit "(Very Common" against HD's "Very Common". Traced to
+#:     kirby-cost: AdderTemplate carries no options map, so the template
+#:     display is not present anywhere in the loaded model -- the .hdt parser
+#:     reads it and the provider drops it. Fixing it needs that map first,
+#:     which is a template-model change. 20 lines on Ravel, 18 on Power Lad.
 #:  4. The multipower CONTAINER row -- HD prints it as a GENERIC_OBJECT list
 #:     with a blank display; we print the MULTIPOWER framework object. One
 #:     row, three keys.
