@@ -1,15 +1,17 @@
 """generateOutput's fixed opening — the part before any character data."""
 from kirby_sheet.render import render
+from tests.stub_hero import stub_hero
 from kirby_sheet.template import Template
 
 PINNED = dict(app_version="headless-fork", timestamp="TS", export_id="EID",
               save_timestamp="STS", character_file="CF")
 
 
-#: The opening region does not read the character. Passing None is not a
-#: shortcut -- it PROVES the region does not touch it, because anything that
-#: did would raise AttributeError here.
-NO_HERO = None
+#: These templates carry only opening-region tokens, so nothing the later
+#: phases substitute appears in them -- but the whole pipeline still runs, so
+#: a hero-shaped object is required. Distinct stub values throughout; see
+#: tests/stub_hero.py.
+NO_HERO = stub_hero()
 
 
 def _render(text: str) -> str:

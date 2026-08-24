@@ -215,7 +215,9 @@ def test_inspect_missing_character_names_the_path(tmp_path, capsys):
 def test_inspect_reports_counts_and_names_the_character(tmp_path, capsys):
     """The real path. Gated on a character because --inspect now loads one."""
     template = tmp_path / "t.hde"
-    template.write_text("<!--APP_VERSION--><!--CHARACTER_NAME-->")
+    # NEVER_IMPLEMENTED is not a real token, deliberately: a real one
+    # stops being unresolved the moment its phase lands.
+    template.write_text("<!--APP_VERSION--><!--NEVER_IMPLEMENTED-->")
 
     code = main(["--inspect", str(template), str(character_path())])
 
@@ -224,7 +226,7 @@ def test_inspect_reports_counts_and_names_the_character(tmp_path, capsys):
     assert "2 tokens used" in out
     assert "1 resolved" in out
     assert "1 unresolved" in out
-    assert "CHARACTER_NAME" in out
+    assert "NEVER_IMPLEMENTED" in out
     assert "measured against:" in out
 
 
