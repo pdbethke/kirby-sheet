@@ -30,8 +30,15 @@ def apply(text: str, hero) -> str:
 def _section(text: str, tag: str, objects, extras, hero) -> str:
     def render(block: str, obj, index: int) -> str:
         block = _adders(block, obj)
-        block = items.apply(block, obj)
-        return extras(block, obj, hero)
+        # Section-specific tokens BEFORE the generic ones. Java does the same
+        # -- getPowerString fills TEXT and only then calls getGeneralString
+        # (HTMLWriter.java:5095-5097) -- and it matters for the tokens the two
+        # share: TEXT means the SECTION's rendering of the power, which for a
+        # Compound Power uses the section's separator rather than the power's
+        # own. Letting the generic pass win printed "<b>plus</b>" where HD
+        # writes "plus", and the child names HD omits.
+        block = extras(block, obj, hero)
+        return items.apply(block, obj)
 
     return repeat.render_list(text, f"<!--{tag}-->", f"<!--/{tag}-->",
                               list(objects or ()), render)
@@ -137,15 +144,44 @@ def _column3(obj) -> str:
 
 def _power_extras(block: str, obj, hero) -> str:
     block = _framework_flags(block, obj)
-    block = _sensory(block, obj)
+    block = swap_value("<!--TEXT-->", _text_for(obj), block)
+    block = swap_value("<!--POWER_TEXT-->", _text_for(obj), block)
     block = swap_value("<!--POWER_END-->", _column3(obj), block)
     return swap_value("<!--POWER_COST-->",
                       _column1(obj, hero), block)
 
 
+#: What HD joins a Compound Power's parts with when the section block does not
+#: declare `<!--COMPOUND_POWER_SEPARATOR-->` (HTMLWriter.java:5008).
+#:
+#: Note it is PLAIN. The power's own separator is " <b>plus</b> ", and HD
+#: swaps this one in for the duration of the render -- so a compound power's
+#: TEXT carries no bold, while the same power's column-2 output elsewhere
+#: does. Reading the power's own separator printed "<b>plus</b>" where Hero
+#: Designer writes "plus".
+COMPOUND_SEPARATOR = " plus "
+
+
+def _text_for(obj) -> str:
+    """TEXT for one power (HTMLWriter.java:5083-5092).
+
+    A Compound Power is rendered with the SECTION's compound separator rather
+    than its own; everything else takes its nameless output unchanged.
+    """
+    from kirby_cost.objects.powers.compound_power import CompoundPower
+    if not isinstance(obj, CompoundPower):
+        return str(_read(obj, "nameless_column2_output"))
+    original = obj.list_separator
+    obj.list_separator = COMPOUND_SEPARATOR
+    try:
+        return str(_read(obj, "nameless_column2_output"))
+    finally:
+        obj.list_separator = original
+
+
 def _equipment_extras(block: str, obj, hero) -> str:
     block = _framework_flags(block, obj)
-    block = _sensory(block, obj)
+    block = swap_value("<!--TEXT-->", _text_for(obj), block)
     block = swap_value("<!--EQUIPMENT_END-->", _column3(obj), block)
     return swap_value("<!--EQUIPMENT_COST-->", _column1(obj, hero), block)
 
