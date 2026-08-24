@@ -42,11 +42,14 @@ def apply(block: str, obj) -> str:
     block = _conditional(block, "IS_NOT_LIST", not _is_list(obj))
     block = _conditional(block, "IS_NOT_SEPARATOR", not _is_separator(obj))
     block = _list_item(block, obj)
+    block = _filter_by_type(block, obj)
 
     option = getattr(obj, "selected_option", None)
     for tag, value in (
         ("NAME", _read(obj, "name")),
-        ("XMLID", _read(obj, "xmlid")),
+        # The DOCUMENT's xmlid, not the class's. HD prints what the file
+        # said, and a Multipower's file says GENERIC_OBJECT.
+        ("XMLID", _read(obj, "document_xmlid") or _read(obj, "xmlid")),
         ("LEVELS", str(_read(obj, "levels", 0) or 0)),
         ("DISPLAY", _read(obj, "display")),
         ("INPUT", _read(obj, "input")),
@@ -141,3 +144,23 @@ def _list_item(block: str, obj) -> str:
                 block = swap_long_value(open_tag, close_tag, "", block)
     return _conditional(block, "IS_NOT_LIST_ITEM", parent is None)
 
+
+#: The nine type filters getGeneralString applies, in Java's order
+#: (HTMLWriter.java:3982-3990). Only IF_SENSORY appears in the shipped 6E
+#: template, but they are one mechanism and porting one of nine would be an
+#: arbitrary line to draw.
+TYPE_FILTERS = ("ATTACK", "DEFENSE", "MOVEMENT", "MENTAL", "SPECIAL",
+                "ADJUSTMENT", "SENSORY", "SENSEAFFECTING", "BODYAFFECTING")
+
+
+def _filter_by_type(block: str, obj) -> str:
+    """``filterByType`` (HTMLWriter.java:212-227), applied for each type.
+
+    Keeps `<!--IF_X-->…<!--/IF_X-->` when the object's TYPES contain X and
+    strips it otherwise. The types come from the template, so this asks the
+    object what it is rather than guessing from its xmlid.
+    """
+    types = {str(x).upper() for x in (getattr(obj, "types", ()) or ())}
+    for name in TYPE_FILTERS:
+        block = _conditional(block, f"IF_{name}", name in types)
+    return block
