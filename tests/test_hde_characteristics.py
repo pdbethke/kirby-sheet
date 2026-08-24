@@ -34,12 +34,25 @@ KEYS = ("str_val str_pts str_roll str_damage str_lift str_end "
 #: str_end is UNRESOLVED and deliberately excluded from the sweep below.
 #:
 #: Hero Designer divides Bokor's STR by 5 (15 -> 3) and Ravel's and Power
-#: Lad's by 10 (10 -> 1, 40 -> 4). All three files carry an IDENTICAL <STR>
-#: element bar its LEVELS, none has a <RULES> element, and none has a
-#: COSTSEND or REDUCEDEND modifier -- the two things Strength.getBaseEND
-#: consults to change that divisor. Whatever selects it has not been found,
-#: so nothing here is "fixed" by guessing: any divisor that satisfies two of
-#: the three characters breaks the third.
+#: Lad's by 10 (10 -> 1, 40 -> 4). Investigated 2026-08-24 and still open:
+#:
+#:   * All three files carry an IDENTICAL <STR> element bar its LEVELS.
+#:   * None has a <RULES> element, so campaign rules are identical defaults.
+#:   * None has an APPEREND override, and the template says USESEND="Yes".
+#:   * None has a COSTSEND or REDUCEDEND modifier -- the two things
+#:     Strength.getBaseEND consults to change that divisor.
+#:   * The engine now matches Java exactly here: the STR special-case lives
+#:     in the base getAPPerEnd (GenericObject.java:1344-1346), which makes
+#:     the divisor 5, which is right for Bokor and double for the other two.
+#:
+#: The one structural difference is that BOKOR ALONE HAS GROWTH, whose
+#: +15 STR reaches nothing because kirby-cost never implements the
+#: option-driven characteristic increases (growth.py:52 says so). That is the
+#: leading explanation and the next thing to build.
+#:
+#: The divisor was briefly changed to make two of three characters pass. That
+#: was scoring rather than evidence and has been reverted; any divisor that
+#: satisfies two of the three breaks the third.
 #:
 #: It is asserted separately below rather than dropped, so the gap stays
 #: visible and fails loudly the day it is understood.
