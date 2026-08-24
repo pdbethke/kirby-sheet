@@ -7,13 +7,15 @@ text it should not have touched.
 
 Skips unless the oracle and a character are configured.
 """
+import re
 from pathlib import Path
 
 import pytest
 
 from kirby_sheet.render import render
 from kirby_sheet.template import Template
-from tests.corpus import character_path, oracle_path, why_unavailable
+from tests.corpus import (character_path, oracle_path, template_path,
+                          why_unavailable)
 from tests.oracle import normalise, oracle_export
 
 MINIMAL = Path(__file__).parent / "fixtures" / "minimal.hde"
@@ -86,3 +88,44 @@ def test_the_documents_are_byte_identical():
     hd = normalise(oracle_export(MINIMAL, character))
     ours = normalise(_ours(character))
     assert ours == hd
+
+
+# ---------------------------------------------------------------------------
+# THE GATE: the whole shipped 6E template, not a sample of keys.
+# ---------------------------------------------------------------------------
+
+_needs_template = pytest.mark.skipif(
+    template_path() is None,
+    reason=why_unavailable() or "KIRBY_SHEET_HDE is configured")
+
+
+def _render_shipped(character):
+    from kirby_sheet.build import hero_from_hdc
+    template = template_path()
+    return render(Template.from_path(template), hero_from_hdc(character),
+                  app_version="headless-fork", timestamp="<PINNED>",
+                  export_id="<PINNED>", save_timestamp="<PINNED>",
+                  character_file=character.name)
+
+
+@_needs_template
+def test_no_marker_survives_in_the_shipped_template():
+    """Checked before the byte diff, because it NAMES the token that leaked
+    where a diff would only say the documents differ."""
+    ours = _render_shipped(character_path())
+    leaked = sorted(set(re.findall(r"<!--/?[A-Za-z0-9_]+-->", ours)))
+    assert leaked == [], f"unresolved tokens: {leaked}"
+
+
+@_needs_template
+def test_the_shipped_6e_template_is_byte_identical():
+    """The whole point of the backend.
+
+    minimal.hde proved the opening; this proves the port. Every token the
+    shipped template uses, every section, every item -- one document,
+    compared whole, with only the four volatile values normalised.
+    """
+    character = character_path()
+    ours = normalise(_render_shipped(character))
+    theirs = normalise(oracle_export(template_path(), character))
+    assert ours == theirs

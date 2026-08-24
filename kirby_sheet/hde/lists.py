@@ -105,7 +105,12 @@ def _maneuver_extras(block: str, obj, hero) -> str:
     for tag, attribute in (("MANEUVER_PHASE", "phase"),
                            ("MANEUVER_OCV", "ocv"),
                            ("MANEUVER_DCV", "dcv"),
-                           ("MANEUVER_EFFECT", "effect")):
+                           # `resolved_effect`, not `effect`: HD's getEffect()
+                           # substitutes the damage-class placeholders a
+                           # template writes -- [NNDDC], [STRDC], [NORMALDC]
+                           # and the rest (Maneuver.java:836-846) -- and the
+                           # raw field still carries them.
+                           ("MANEUVER_EFFECT", "resolved_effect")):
         block = swap_value(f"<!--{tag}-->", str(_read(obj, attribute)), block)
     return block
 
