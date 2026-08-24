@@ -368,6 +368,17 @@ _needs_ravel = pytest.mark.skipif(
     not _RAVEL.is_file() or not (os.environ.get("KIRBY_COST_HDT") or "").strip(),
     reason="needs Ravel.hdc and KIRBY_COST_HDT",
 )
+#: Bokor, named explicitly for the same reason _RAVEL and _POWERLAD are: the
+#: test below asserts HIS point totals, so it must not run against whatever
+#: KIRBY_SHEET_HDC happens to point at. It did, and failed the moment the
+#: env var was aimed at another character.
+_BOKOR = Path("~/Documents/Champions/Bokor.hdc").expanduser()
+
+_needs_bokor = pytest.mark.skipif(
+    not _BOKOR.is_file() or not (os.environ.get("KIRBY_COST_HDT") or "").strip(),
+    reason="needs Bokor.hdc and KIRBY_COST_HDT",
+)
+
 _needs_powerlad = pytest.mark.skipif(
     not _POWERLAD.is_file() or not (os.environ.get("KIRBY_COST_HDT") or "").strip(),
     reason="needs PowerLad.hdc and KIRBY_COST_HDT",
@@ -395,10 +406,10 @@ def test_powerlad_has_half_a_point_unspent_not_zero():
     assert t.available_points == 120.5   # HD's 5E-style figure, unchanged
 
 
-@_needs_character
+@_needs_bokor
 def test_bokor_is_overspent_by_exactly_one_point():
     """Bokor's 6E Unspent is -1 -- negative, and must not be clamped to 0."""
-    t = sheet_from_hdc(character_path()).totals
+    t = sheet_from_hdc(_BOKOR).totals
     assert t.base_points == 270.0
     assert t.experience == 5.0
     assert t.complications_taken == 40.0
