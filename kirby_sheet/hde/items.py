@@ -48,7 +48,7 @@ def apply(block: str, obj) -> str:
         ("NAME", _read(obj, "name")),
         ("XMLID", _read(obj, "xmlid")),
         ("LEVELS", str(_read(obj, "levels", 0) or 0)),
-        ("DISPLAY", _display(obj)),
+        ("DISPLAY", _read(obj, "display")),
         ("INPUT", _read(obj, "input")),
         ("ALIAS", _read(obj, "alias")),
         ("TEXT", _text(obj)),
@@ -141,22 +141,3 @@ def _list_item(block: str, obj) -> str:
                 block = swap_long_value(open_tag, close_tag, "", block)
     return _conditional(block, "IS_NOT_LIST_ITEM", parent is None)
 
-
-def _display(obj) -> str:
-    """HD's DISPLAY token -- the object's TYPE, not the name its owner gave it.
-
-    `GenericObject.getDisplay()` (GenericObject.java:1631) returns the display
-    string the template supplied. kirby-cost overwrites `display` with the
-    object's NAME whenever it has one, so a power called "Mojo Hand" reports
-    "Mojo Hand" where HD reports "Hand-To-Hand Attack".
-
-    The alias is the type in that case. It is NOT a blanket substitute: three
-    of Bokor's objects have an empty name and a display that differs from
-    their alias (PS is aliased "PS" but displays "Professional Skill"), and
-    for those the unpolluted `display` is the right answer. So the name is
-    what selects between them.
-    """
-    name = str(_read(obj, "name")).strip()
-    if name and str(_read(obj, "display")).strip() == name:
-        return _read(obj, "alias")
-    return _read(obj, "display")
