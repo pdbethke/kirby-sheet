@@ -156,6 +156,22 @@ def _column1(obj, hero) -> str:
     """
     from kirby_cost.util.rounder import round_up
     value = _read(obj, "column1_output")
-    if value:
-        return str(value)
-    return str(round_up(_read(obj, "real_cost", 0) or 0))
+    if not value:
+        value = str(round_up(_read(obj, "real_cost", 0) or 0))
+    return str(value) + _column1_suffix(obj)
+
+
+def _column1_suffix(obj) -> str:
+    """``getColumn1Suffix`` (GenericObject.java:1499).
+
+    The parent decides it. A Multipower marks a fixed slot with "f", so its
+    cost prints as "1f" rather than "1" -- without this, every fixed slot in
+    every multipower is one character wrong and the byte diff never closes.
+    """
+    parent = getattr(obj, "parent", None)
+    if parent is None or not hasattr(parent, "column1_suffix"):
+        return ""
+    try:
+        return parent.column1_suffix(obj) or ""
+    except Exception:  # noqa: BLE001 -- a parent that cannot answer adds nothing
+        return ""

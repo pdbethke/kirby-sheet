@@ -42,24 +42,32 @@ def _ours_and_theirs():
     return normalise(ours), normalise(oracle_export(template, character))
 
 
-#: What still differs, measured against Bokor 2026-08-24: 53 lines of ~1250,
-#: down from 115. Each is a distinct, identified gap, NOT a mystery:
+#: What still differs, measured 2026-08-24: Bokor 27 lines of 729, Ravel 80
+#: of 1254 -- Bokor was 115 when this section was first rendered. Each is a
+#: distinct, identified gap:
 #:
-#:  1. `display` on some objects -- a Knowledge Skill whose name is "CuK"
-#:     reports "CuK" where HD reports "Knowledge Skill". The name/alias rule
-#:     in items._display covers most cases but not this one.
-#:  2. `end_cost` -- HD reports 0 for powers paid for with Charges; we report
-#:     the raw end_usage. getEndUsage() must be consulting the charges
-#:     modifier somewhere this port does not.
-#:  3. Multipower slots -- HD prints a GENERIC_OBJECT list where we print the
-#:     MULTIPOWER framework object, so the powers section is one row out.
-#:  4. `cost: 1f` -- HD suffixes "f" on a fixed multipower slot;
-#:     getColumn1Output does that and this port does not.
-#:  5. `text` on a compound power -- HD emits the NAMELESS text and the plain
-#:     word "plus"; we emit the named text with <i>/<b> markup.
-#:  6. `sensory_power: true` -- IF_SENSORY never fires; nothing sets
+#:  1. `text` on a COMPOUND POWER -- HD emits the nameless text joined by a
+#:     plain "plus"; kirby-cost's nameless_column2_output keeps the child
+#:     names as "<i>Wrap 'em:</i>" and wraps the joiner as "<b>plus</b>".
+#:  2. `end_cost` -- attributed to the wrong rows inside a multipower, and 0
+#:     where HD reports a value (and the reverse). getEndUsage consults the
+#:     PARENT list's modifiers (GenericObject.java:1782-1795); this port
+#:     reads the slot's own end_usage.
+#:  3. `option` -- HD reports the option's own label ("A large group") where
+#:     we report the character's input ("Home City").
+#:  4. The multipower CONTAINER row -- HD prints it as a GENERIC_OBJECT list
+#:     with a blank display; we print the MULTIPOWER framework object. One
+#:     row, three keys.
+#:  5. `sensory_power: true` -- IF_SENSORY never fires; nothing sets
 #:     is_sensory on a loaded power.
-#:  7. `str_end` -- the Growth gap recorded in test_hde_characteristics.
+#:  6. `man_notes` -- a maneuver effect keeps the "[NNDDC]" placeholder that
+#:     HD resolves to "1d6 NND".
+#:  7. `display` on a Knowledge Skill -- HD reports "Knowledge Skill" where
+#:     we report the abbreviation "CuK". kirby-cost is FAITHFUL here (Java
+#:     assigns display = "CuK" too, KnowledgeSkill.java:509-516); the
+#:     divergence is in the guard that decides whether to. Touching it risks
+#:     the oracle-verified column-2 output, so it is not being guessed at.
+#:  8. `str_end` -- the Growth gap recorded in test_hde_characteristics.
 #:
 #: Marked xfail STRICT rather than deleted or loosened: it fails the day it
 #: passes, which is the only way this stays honest. The two tests below it
