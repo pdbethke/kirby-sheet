@@ -6,8 +6,14 @@ PINNED = dict(app_version="headless-fork", timestamp="TS", export_id="EID",
               save_timestamp="STS", character_file="CF")
 
 
+#: The opening region does not read the character. Passing None is not a
+#: shortcut -- it PROVES the region does not touch it, because anything that
+#: did would raise AttributeError here.
+NO_HERO = None
+
+
 def _render(text: str) -> str:
-    return render(Template(text=text), **PINNED)
+    return render(Template(text=text), NO_HERO, **PINNED)
 
 
 def test_template_name_block_is_removed():
@@ -49,6 +55,7 @@ def test_the_substitution_order_is_load_bearing():
     """
     out = render(
         Template(text="<!--APP_VERSION-->|<!--TIMESTAMP-->"),
+        NO_HERO,
         app_version="<!--TIMESTAMP-->",
         timestamp="TS",
         export_id="EID",

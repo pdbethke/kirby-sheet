@@ -15,13 +15,17 @@ does not, and it is one line item on a person's worklist, not two.
 from __future__ import annotations
 
 from kirby_sheet.inspect import TemplateReport, describe, inspect_template
+
+#: These fixtures use only opening-region tokens, which do not read the
+#: character. None proves that: anything reading it would raise here.
+NO_HERO = None
 from kirby_sheet.template import Template
 
 
 def test_template_with_only_implemented_tokens_has_no_unresolved():
     template = Template(text="v=<!--APP_VERSION--> t=<!--TIMESTAMP-->")
 
-    report = inspect_template(template)
+    report = inspect_template(template, NO_HERO)
 
     assert report.tokens_unresolved == ()
     assert set(report.tokens_resolved) == {"APP_VERSION", "TIMESTAMP"}
@@ -30,7 +34,7 @@ def test_template_with_only_implemented_tokens_has_no_unresolved():
 def test_an_unimplemented_token_is_reported_unresolved():
     template = Template(text="name: <!--CHARACTER_NAME-->")
 
-    report = inspect_template(template)
+    report = inspect_template(template, NO_HERO)
 
     assert report.tokens_unresolved == ("CHARACTER_NAME",)
     assert report.tokens_resolved == ()
@@ -39,7 +43,7 @@ def test_an_unimplemented_token_is_reported_unresolved():
 def test_tokens_used_counts_each_token_once():
     template = Template(text="<!--APP_VERSION--> and again <!--APP_VERSION-->")
 
-    report = inspect_template(template)
+    report = inspect_template(template, NO_HERO)
 
     assert report.tokens_used == ("APP_VERSION",)
 
@@ -56,7 +60,7 @@ def test_a_token_named_only_inside_a_stripped_block_is_reported_resolved():
         text="<!--TEMPLATE_DESCRIPTION-->uses <!--CHARACTER_NAME--><!--/TEMPLATE_DESCRIPTION--> body"
     )
 
-    report = inspect_template(template)
+    report = inspect_template(template, NO_HERO)
 
     assert report.tokens_used == ("TEMPLATE_DESCRIPTION", "CHARACTER_NAME")
     assert report.tokens_resolved == ("TEMPLATE_DESCRIPTION", "CHARACTER_NAME")
@@ -69,7 +73,7 @@ def test_a_paired_block_counts_as_one_token_not_two():
     because it has two markers."""
     template = Template(text="<!--TEMPLATE_NAME-->Sheet<!--/TEMPLATE_NAME-->")
 
-    report = inspect_template(template)
+    report = inspect_template(template, NO_HERO)
 
     assert report.tokens_used == ("TEMPLATE_NAME",)
     assert report.tokens_resolved == ("TEMPLATE_NAME",)
@@ -81,7 +85,7 @@ def test_mixed_case_token_spellings_fold_to_one_token():
     not two -- a template author mixing case should not double-count."""
     template = Template(text="<!--APP_VERSION--> and <!--app_version-->")
 
-    report = inspect_template(template)
+    report = inspect_template(template, NO_HERO)
 
     assert report.tokens_used == ("APP_VERSION",)
     assert report.tokens_resolved == ("APP_VERSION",)
@@ -92,7 +96,7 @@ def test_the_three_tuples_are_consistent():
         text="<!--APP_VERSION--><!--CHARACTER_NAME--><!--TIMESTAMP--><!--STR-->"
     )
 
-    report = inspect_template(template)
+    report = inspect_template(template, NO_HERO)
 
     assert set(report.tokens_used) == set(report.tokens_resolved) | set(report.tokens_unresolved)
     assert set(report.tokens_resolved) & set(report.tokens_unresolved) == set()
@@ -101,7 +105,7 @@ def test_the_three_tuples_are_consistent():
 def test_tokens_used_preserves_first_appearance_order():
     template = Template(text="<!--STR--><!--CHARACTER_NAME--><!--STR--><!--APP_VERSION-->")
 
-    report = inspect_template(template)
+    report = inspect_template(template, NO_HERO)
 
     assert report.tokens_used == ("STR", "CHARACTER_NAME", "APP_VERSION")
 
@@ -120,7 +124,7 @@ def test_describe_states_the_counts():
     template = Template(
         text="<!--APP_VERSION--><!--CHARACTER_NAME--><!--STR-->"
     )
-    report = inspect_template(template)
+    report = inspect_template(template, NO_HERO)
 
     text = describe(report)
 
@@ -132,7 +136,7 @@ def test_describe_states_the_counts():
 def test_describe_lists_the_unresolved_tokens():
     template = Template(text="<!--APP_VERSION--><!--CHARACTER_NAME-->")
 
-    text = describe(inspect_template(template))
+    text = describe(inspect_template(template, NO_HERO))
 
     assert "CHARACTER_NAME" in text
     assert "APP_VERSION" not in text.split("Unresolved:")[-1]
@@ -150,17 +154,17 @@ def test_tracks_the_renderer_not_a_hardcoded_list(monkeypatch):
     # Before: APP_VERSION resolves, CHARACTER_NAME (genuinely unimplemented,
     # not merely absent from render()'s source text -- it never appears
     # there at all) does not.
-    before = inspect_template(template)
+    before = inspect_template(template, NO_HERO)
     assert "APP_VERSION" in before.tokens_resolved
     assert "CHARACTER_NAME" in before.tokens_unresolved
 
     original_render = render_module.render
 
-    def broken_render(template, **kwargs):
+    def broken_render(template, hero, **kwargs):
         # Simulate APP_VERSION no longer being substituted -- as if the
         # swap_value("<!--APP_VERSION-->", ...) call were deleted from
         # render(). Any other real behaviour is left alone.
-        text = original_render(template, **kwargs)
+        text = original_render(template, hero, **kwargs)
         return text.replace(kwargs["app_version"], "<!--APP_VERSION-->", 1) \
             if kwargs["app_version"] not in ("", None) else text
 
@@ -168,6 +172,6 @@ def test_tracks_the_renderer_not_a_hardcoded_list(monkeypatch):
     import kirby_sheet.inspect as inspect_module
     monkeypatch.setattr(inspect_module, "render", broken_render)
 
-    after = inspect_module.inspect_template(template)
+    after = inspect_module.inspect_template(template, NO_HERO)
     assert "APP_VERSION" in after.tokens_unresolved
     assert "APP_VERSION" not in after.tokens_resolved

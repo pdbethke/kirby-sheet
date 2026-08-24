@@ -41,6 +41,18 @@ def build_sheet(hero) -> Sheet:
     )
 
 
+def hero_from_hdc(path: str | os.PathLike):
+    """Load a character file and return the engine's own LoadedHero.
+
+    The `.hde` backend renders from the hero rather than the Sheet, and
+    `--inspect` needs one for the same reason. Here, not in the CLI, so that
+    the CLI never imports kirby-cost -- the import boundary is what keeps
+    every other module's tests runnable without the engine installed.
+    """
+    from kirby_cost.io.hdc_loader import HDCLoader
+    return HDCLoader().load_file(str(path))
+
+
 def sheet_from_hdc(path: str | os.PathLike) -> Sheet:
     """Load a character file and build its Sheet.
 

@@ -20,10 +20,12 @@ returns `bytes`, not `str` -- `_FORMATS` is typed `Callable[[Sheet], str]`
 -- and a PDF written down a terminal or a text pipe is as useless as a
 `.hdc` file would be. It requires `-o` for that reason too.
 
-`--inspect` is not one of those either, and for the opposite reason from
-`--hdc`: it takes a TEMPLATE path instead of a character, so there is no
-character argument to load at all. It reports which tokens a `.hde`
+`--inspect` is not one of those either: it takes a TEMPLATE path as its
+flag value AND a character positionally. It reports which tokens a `.hde`
 template uses and which the renderer resolves (`kirby_sheet.inspect`).
+The character is not optional -- rendering requires one, and the answer
+depends on it, because a token inside a block the character does not
+trigger is reported resolved.
 """
 from __future__ import annotations
 
@@ -32,7 +34,7 @@ import sys
 from pathlib import Path
 from typing import Callable
 
-from kirby_sheet.build import copy_hdc, sheet_from_hdc
+from kirby_sheet.build import copy_hdc, hero_from_hdc, sheet_from_hdc
 from kirby_sheet.formats.as_html import to_html
 from kirby_sheet.formats.as_json import to_json
 from kirby_sheet.formats.as_pdf import to_pdf
@@ -71,15 +73,20 @@ def _build_parser() -> argparse.ArgumentParser:
                           help="write the sheet as a PDF (requires -o)")
     formats.add_argument("--inspect", metavar="TEMPLATE",
                           help="report which tokens TEMPLATE (a .hde file) "
-                               "uses and which the renderer resolves -- "
-                               "takes a template, not a character")
+                               "uses and which the renderer resolves for the "
+                               "given character")
     parser.add_argument("-o", "--output", metavar="FILE",
                          help="write to FILE instead of stdout (UTF-8)")
     return parser
 
 
 def _run_inspect(args: argparse.Namespace) -> int:
-    """`--inspect TEMPLATE`: report the template's tokens, not a character."""
+    """`--inspect TEMPLATE CHARACTER`: which of TEMPLATE's tokens resolve.
+
+    A character is REQUIRED. Rendering needs one, and the answer depends on
+    it: a token inside a block the character does not trigger is reported
+    resolved because the block was stripped. See `kirby_sheet/inspect.py`.
+    """
     template_path = Path(args.inspect)
     if not template_path.is_file():
         print(f"kirby-sheet: template file not found: {template_path}",
@@ -92,7 +99,12 @@ def _run_inspect(args: argparse.Namespace) -> int:
         print(f"kirby-sheet: {exc}", file=sys.stderr)
         return 1
 
-    document = describe(inspect_template(template))
+    character_path = Path(args.character)
+    if not character_path.is_file():
+        print(f"kirby-sheet: character file not found: {character_path}",
+              file=sys.stderr)
+        return 1
+    document = describe(inspect_template(template, hero_from_hdc(character_path)))
 
     if args.output:
         Path(args.output).write_text(document, encoding="utf-8")
@@ -109,9 +121,10 @@ def main(argv: list[str] | None = None) -> int:
         args = parser.parse_args(argv)
 
         if args.inspect:
-            if args.character:
-                parser.error("--inspect takes a template, not a character "
-                             "-- pass the .hde template alone")
+            if not args.character:
+                parser.error("--inspect needs a character as well as a "
+                             "template: which tokens resolve depends on the "
+                             "character being rendered")
             return _run_inspect(args)
 
         if not args.character:

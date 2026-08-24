@@ -24,6 +24,15 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+def _hero(character):
+    """minimal.hde uses only opening-region tokens, which do not read the
+    character -- but render() requires one, and loading the real character is
+    honest where a None would quietly assert something this gate does not
+    test."""
+    from kirby_sheet.build import hero_from_hdc
+    return hero_from_hdc(character)
+
+
 def _ours(character):
     # timestamp, export_id and save_timestamp are all passed the same literal
     # "<PINNED>", and normalise() collapses HD's three real values to that
@@ -34,6 +43,7 @@ def _ours(character):
     # uses distinct sentinels per argument.
     return render(
         Template.from_path(MINIMAL),
+        _hero(character),
         app_version="headless-fork",
         timestamp="<PINNED>",
         export_id="<PINNED>",

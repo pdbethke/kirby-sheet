@@ -12,12 +12,14 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-#: variable -> what it should name. KIRBY_SHEET_HDE, which points at a
-#: user-supplied template, arrives in Milestone 2 — this milestone's gate
-#: renders the bundled minimal.hde, so nothing here would read it.
+#: variable -> what it should name. KIRBY_SHEET_HDE arrived with the full
+#: .hde backend: the opening milestone's gate rendered the bundled
+#: minimal.hde, but the byte-fidelity gate now targets a real shipped
+#: template, which this project does not ship and must be pointed at.
 INPUTS = {
     "KIRBY_SHEET_HDC": "a .hdc character to render",
     "KIRBY_SHEET_ORACLE": "the hd6cli.sh wrapper from kirby-hd-oracle",
+    "KIRBY_SHEET_HDE": "the .hde export template to render (pdf_format_6.hde)",
 }
 
 
@@ -37,6 +39,10 @@ def oracle_path() -> Path | None:
     return _from_env("KIRBY_SHEET_ORACLE")
 
 
+def template_path() -> Path | None:
+    return _from_env("KIRBY_SHEET_HDE")
+
+
 def why_unavailable() -> str:
     """Which inputs are missing, and whether they were unset or mispointed.
 
@@ -48,7 +54,7 @@ def why_unavailable() -> str:
     keeps a broken setup from looking like an intentional one.
     """
     problems = []
-    for var in ("KIRBY_SHEET_ORACLE", "KIRBY_SHEET_HDC"):
+    for var in ("KIRBY_SHEET_ORACLE", "KIRBY_SHEET_HDC", "KIRBY_SHEET_HDE"):
         raw = (os.environ.get(var) or "").strip()
         if not raw:
             problems.append(f"{var} unset")
