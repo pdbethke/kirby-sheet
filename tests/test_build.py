@@ -339,16 +339,25 @@ def test_the_round_tripped_character_reloads_unchanged(tmp_path):
 
 @_needs_character
 def test_the_round_trip_normalises_bom_and_line_endings(tmp_path):
-    """These two differences are deliberate and documented in kirby-cost.
-    Pinning them here means a future change to that behaviour surfaces as a
-    failing test rather than as a silent difference in someone's file."""
+    """The round trip PRESERVES the source's encoding and uses CRLF.
+
+    This used to assert a UTF-16 BOM unconditionally, which held only because
+    every character it had been pointed at was UTF-16. Hero Designer writes
+    both: the authored characters are UTF-16 and the published packs are
+    UTF-8, and `copy_hdc` keeps whichever it was given. Asserting one made the
+    test fail on a UTF-8 character for a difference that is correct.
+    """
     target_path = tmp_path / "roundtrip.hdc"
+    source_bytes = character_path().read_bytes()
 
     copy_hdc(character_path(), target_path)
 
     target_bytes = target_path.read_bytes()
-    assert target_bytes.startswith(b"\xff\xfe")
-    assert "\r\n" in target_bytes.decode("utf-16")
+    source_is_utf16 = source_bytes[:2] in (b"\xff\xfe", b"\xfe\xff")
+    assert (target_bytes[:2] in (b"\xff\xfe", b"\xfe\xff")) == source_is_utf16, (
+        "the round trip changed the file's encoding")
+    text = target_bytes.decode("utf-16" if source_is_utf16 else "utf-8")
+    assert "\r\n" in text
 
 
 # --- the 6E points model, against real characters --------------------------
@@ -368,6 +377,17 @@ _needs_ravel = pytest.mark.skipif(
     not _RAVEL.is_file() or not (os.environ.get("KIRBY_COST_HDT") or "").strip(),
     reason="needs Ravel.hdc and KIRBY_COST_HDT",
 )
+#: Bokor, named explicitly for the same reason _RAVEL and _POWERLAD are: the
+#: test below asserts HIS point totals, so it must not run against whatever
+#: KIRBY_SHEET_HDC happens to point at. It did, and failed the moment the
+#: env var was aimed at another character.
+_BOKOR = Path("~/Documents/Champions/Bokor.hdc").expanduser()
+
+_needs_bokor = pytest.mark.skipif(
+    not _BOKOR.is_file() or not (os.environ.get("KIRBY_COST_HDT") or "").strip(),
+    reason="needs Bokor.hdc and KIRBY_COST_HDT",
+)
+
 _needs_powerlad = pytest.mark.skipif(
     not _POWERLAD.is_file() or not (os.environ.get("KIRBY_COST_HDT") or "").strip(),
     reason="needs PowerLad.hdc and KIRBY_COST_HDT",
@@ -395,10 +415,10 @@ def test_powerlad_has_half_a_point_unspent_not_zero():
     assert t.available_points == 120.5   # HD's 5E-style figure, unchanged
 
 
-@_needs_character
+@_needs_bokor
 def test_bokor_is_overspent_by_exactly_one_point():
     """Bokor's 6E Unspent is -1 -- negative, and must not be clamped to 0."""
-    t = sheet_from_hdc(character_path()).totals
+    t = sheet_from_hdc(_BOKOR).totals
     assert t.base_points == 270.0
     assert t.experience == 5.0
     assert t.complications_taken == 40.0

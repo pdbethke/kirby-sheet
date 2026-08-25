@@ -1,13 +1,21 @@
 """generateOutput's fixed opening — the part before any character data."""
 from kirby_sheet.render import render
+from tests.stub_hero import stub_hero
 from kirby_sheet.template import Template
 
 PINNED = dict(app_version="headless-fork", timestamp="TS", export_id="EID",
               save_timestamp="STS", character_file="CF")
 
 
+#: These templates carry only opening-region tokens, so nothing the later
+#: phases substitute appears in them -- but the whole pipeline still runs, so
+#: a hero-shaped object is required. Distinct stub values throughout; see
+#: tests/stub_hero.py.
+NO_HERO = stub_hero()
+
+
 def _render(text: str) -> str:
-    return render(Template(text=text), **PINNED)
+    return render(Template(text=text), NO_HERO, **PINNED)
 
 
 def test_template_name_block_is_removed():
@@ -49,6 +57,7 @@ def test_the_substitution_order_is_load_bearing():
     """
     out = render(
         Template(text="<!--APP_VERSION-->|<!--TIMESTAMP-->"),
+        NO_HERO,
         app_version="<!--TIMESTAMP-->",
         timestamp="TS",
         export_id="EID",

@@ -7,13 +7,15 @@ text it should not have touched.
 
 Skips unless the oracle and a character are configured.
 """
+import re
 from pathlib import Path
 
 import pytest
 
 from kirby_sheet.render import render
 from kirby_sheet.template import Template
-from tests.corpus import character_path, oracle_path, why_unavailable
+from tests.corpus import (character_path, oracle_path, template_path,
+                          why_unavailable)
 from tests.oracle import normalise, oracle_export
 
 MINIMAL = Path(__file__).parent / "fixtures" / "minimal.hde"
@@ -22,6 +24,15 @@ pytestmark = pytest.mark.skipif(
     not (oracle_path() and character_path()),
     reason=why_unavailable() or "oracle and character both available",
 )
+
+
+def _hero(character):
+    """minimal.hde uses only opening-region tokens, which do not read the
+    character -- but render() requires one, and loading the real character is
+    honest where a None would quietly assert something this gate does not
+    test."""
+    from kirby_sheet.build import hero_from_hdc
+    return hero_from_hdc(character)
 
 
 def _ours(character):
@@ -34,6 +45,7 @@ def _ours(character):
     # uses distinct sentinels per argument.
     return render(
         Template.from_path(MINIMAL),
+        _hero(character),
         app_version="headless-fork",
         timestamp="<PINNED>",
         export_id="<PINNED>",
@@ -76,3 +88,56 @@ def test_the_documents_are_byte_identical():
     hd = normalise(oracle_export(MINIMAL, character))
     ours = normalise(_ours(character))
     assert ours == hd
+
+
+# ---------------------------------------------------------------------------
+# THE GATE: the whole shipped 6E template, not a sample of keys.
+# ---------------------------------------------------------------------------
+
+_needs_template = pytest.mark.skipif(
+    template_path() is None,
+    reason=why_unavailable() or "KIRBY_SHEET_HDE is configured")
+
+
+def _render_shipped(character):
+    from kirby_sheet.build import hero_from_hdc
+    template = template_path()
+    return render(Template.from_path(template), hero_from_hdc(character),
+                  app_version="headless-fork", timestamp="<PINNED>",
+                  export_id="<PINNED>", save_timestamp="<PINNED>",
+                  character_file=character.name)
+
+
+@_needs_template
+def test_no_marker_survives_in_the_shipped_template():
+    """Checked before the byte diff, because it NAMES the token that leaked
+    where a diff would only say the documents differ."""
+    ours = _render_shipped(character_path())
+    leaked = sorted(set(re.findall(r"<!--/?[A-Za-z0-9_]+-->", ours)))
+    assert leaked == [], f"unresolved tokens: {leaked}"
+
+
+#: Byte fidelity is proven for: Bokor (Heroic6E), Ravel and Power Lad
+#: (Superheroic6E), and "Lawman (Armed)" -- the last because the three
+#: authored characters carry NO EQUIPMENT, so nothing else exercises
+#: getEquipmentString beyond rendering it empty. Point KIRBY_SHEET_HDC at an
+#: equipment-bearing character to exercise that section.
+#:
+#: KNOWN GAP, one key, on a hand-built character only: a power whose options
+#: are SENSE GROUPS declared by GROUPCOST/SENSECOST rather than
+#: TARGETINGCOST -- ADJACENTFIXED is the one to hand -- gets no synthetic
+#: options from hdt_provider._sense_group_options, so its OPTION prints
+#: empty where HD prints "Sight Group". None of the four characters above
+#: has one; "Ravel (CSI Kit)" does.
+@_needs_template
+def test_the_shipped_6e_template_is_byte_identical():
+    """The whole point of the backend.
+
+    minimal.hde proved the opening; this proves the port. Every token the
+    shipped template uses, every section, every item -- one document,
+    compared whole, with only the four volatile values normalised.
+    """
+    character = character_path()
+    ours = normalise(_render_shipped(character))
+    theirs = normalise(oracle_export(template_path(), character))
+    assert ours == theirs

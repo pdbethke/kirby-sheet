@@ -12,12 +12,24 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-#: variable -> what it should name. KIRBY_SHEET_HDE, which points at a
-#: user-supplied template, arrives in Milestone 2 — this milestone's gate
-#: renders the bundled minimal.hde, so nothing here would read it.
+#: variable -> what it should name.
+#:
+#: EVERY ONE OF THESE COMES FROM THE USER'S OWN HERO DESIGNER INSTALLATION,
+#: never from this repository or a sibling checkout. `pdf_format_6.hde` ships
+#: WITH Hero Designer, so anyone who owns HD already has it -- but its path is
+#: theirs, not ours, and this project neither bundles it nor guesses at it.
+#: The same is true of the .hdt template kirby-cost needs (KIRBY_COST_HDT) and
+#: of any character file.
+#:
+#: KIRBY_SHEET_HDE arrived with the full .hde backend: the opening milestone's
+#: gate rendered the hand-written minimal.hde in tests/fixtures, which IS ours
+#: and is the only template this repo carries. The byte-fidelity gate targets
+#: a real shipped template instead, and must be pointed at one.
 INPUTS = {
-    "KIRBY_SHEET_HDC": "a .hdc character to render",
+    "KIRBY_SHEET_HDC": "a .hdc character, from your own HERO Designer files",
     "KIRBY_SHEET_ORACLE": "the hd6cli.sh wrapper from kirby-hd-oracle",
+    "KIRBY_SHEET_HDE": ("a .hde export template from your own HERO Designer "
+                        "installation (pdf_format_6.hde ships with it)"),
 }
 
 
@@ -37,6 +49,10 @@ def oracle_path() -> Path | None:
     return _from_env("KIRBY_SHEET_ORACLE")
 
 
+def template_path() -> Path | None:
+    return _from_env("KIRBY_SHEET_HDE")
+
+
 def why_unavailable() -> str:
     """Which inputs are missing, and whether they were unset or mispointed.
 
@@ -48,7 +64,7 @@ def why_unavailable() -> str:
     keeps a broken setup from looking like an intentional one.
     """
     problems = []
-    for var in ("KIRBY_SHEET_ORACLE", "KIRBY_SHEET_HDC"):
+    for var in ("KIRBY_SHEET_ORACLE", "KIRBY_SHEET_HDC", "KIRBY_SHEET_HDE"):
         raw = (os.environ.get(var) or "").strip()
         if not raw:
             problems.append(f"{var} unset")

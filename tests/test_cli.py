@@ -8,7 +8,7 @@ import os
 import pytest
 
 from kirby_sheet.cli import main
-from tests.corpus import character_path
+from tests.corpus import character_path, why_unavailable
 
 #: Tests that actually load a character need both a .hdc (KIRBY_SHEET_HDC)
 #: and kirby-cost's template (KIRBY_COST_HDT). Neither ships with the repo.
@@ -170,59 +170,79 @@ def test_hdc_flag_with_o_writes_a_file_that_reloads_with_the_same_name(tmp_path)
     assert reloaded.totals.total_points == source_sheet.totals.total_points
 
 
-# --- --inspect: a TEMPLATE, not a character -------------------------------
+# --- --inspect: a TEMPLATE *and* a character ------------------------------
+#
+# The character is required. Rendering needs one, and which tokens resolve
+# depends on it -- a token inside a block the character does not trigger is
+# reported resolved because the block was stripped whole.
 
-def test_inspect_flag_needs_no_character_argument(tmp_path, capsys):
+def test_inspect_without_a_character_is_rejected(tmp_path, capsys):
+    """The inverse of the old rule, which let --inspect run bare. Silently
+    inspecting without a character would report capabilities it cannot know."""
     template = tmp_path / "t.hde"
-    template.write_text("<!--APP_VERSION--><!--CHARACTER_NAME-->")
+    template.write_text("<!--APP_VERSION-->")
 
     code = main(["--inspect", str(template)])
+
+    assert code != 0
+    assert "character" in capsys.readouterr().err
+
+
+def test_inspect_missing_template_names_the_path(tmp_path, capsys):
+    """The template is checked before the character is loaded, so this needs
+    no real .hdc -- and the character path here deliberately does not exist."""
+    missing = tmp_path / "nope.hde"
+
+    code = main(["--inspect", str(missing), str(tmp_path / "anything.hdc")])
+
+    assert code != 0
+    assert str(missing) in capsys.readouterr().err
+
+
+def test_inspect_missing_character_names_the_path(tmp_path, capsys):
+    template = tmp_path / "t.hde"
+    template.write_text("<!--APP_VERSION-->")
+    absent = tmp_path / "nope.hdc"
+
+    code = main(["--inspect", str(template), str(absent)])
+
+    assert code != 0
+    assert str(absent) in capsys.readouterr().err
+
+
+@pytest.mark.skipif(character_path() is None,
+                    reason=why_unavailable() or "a character is available")
+def test_inspect_reports_counts_and_names_the_character(tmp_path, capsys):
+    """The real path. Gated on a character because --inspect now loads one."""
+    template = tmp_path / "t.hde"
+    # NEVER_IMPLEMENTED is not a real token, deliberately: a real one
+    # stops being unresolved the moment its phase lands.
+    template.write_text("<!--APP_VERSION--><!--NEVER_IMPLEMENTED-->")
+
+    code = main(["--inspect", str(template), str(character_path())])
 
     assert code == 0
     out = capsys.readouterr().out
     assert "2 tokens used" in out
     assert "1 resolved" in out
     assert "1 unresolved" in out
-    assert "CHARACTER_NAME" in out
+    assert "NEVER_IMPLEMENTED" in out
+    assert "measured against:" in out
 
 
-def test_inspect_flag_writes_to_a_file_with_o(tmp_path, capsys):
+@pytest.mark.skipif(character_path() is None,
+                    reason=why_unavailable() or "a character is available")
+def test_inspect_writes_to_a_file_with_o(tmp_path, capsys):
     template = tmp_path / "t.hde"
     template.write_text("<!--APP_VERSION-->")
     out_file = tmp_path / "report.txt"
 
-    code = main(["--inspect", str(template), "-o", str(out_file)])
+    code = main(["--inspect", str(template), str(character_path()), "-o", str(out_file)])
 
     assert code == 0
     assert capsys.readouterr().out == ""  # went to the file, not stdout
     assert "1 tokens used" in out_file.read_text(encoding="utf-8")
 
-
-def test_inspect_flag_missing_template_names_the_path(tmp_path, capsys):
-    missing = tmp_path / "nope.hde"
-
-    code = main(["--inspect", str(missing)])
-
-    assert code != 0
-    err = capsys.readouterr().err
-    assert str(missing) in err
-
-
-def test_inspect_with_a_character_argument_is_rejected(tmp_path, capsys):
-    """kirby-sheet CHAR.hdc --inspect T.hde must not silently ignore the
-    character -- --inspect takes a template, not a character."""
-    template = tmp_path / "t.hde"
-    template.write_text("<!--APP_VERSION-->")
-    character = tmp_path / "char.hdc"
-    character.write_text("not really an hdc")
-
-    code = main([str(character), "--inspect", str(template)])
-
-    assert code != 0
-    err = capsys.readouterr().err
-    assert "--inspect" in err
-    assert "template" in err.lower()
-    assert "character" in err.lower()
 
 
 def test_inspect_and_json_together_are_rejected(tmp_path, capsys):

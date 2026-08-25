@@ -14,9 +14,20 @@ For a person building a worklist, both cases mean the same thing: nothing
 to do. A token is only worklist-worthy if it is still sitting in the
 rendered output, unresolved.
 
-**How it is measured.** `render()` is called on the template with a set of
-harmless sentinel values, and the token set before is compared against the
-token set after. Whatever disappeared is "resolved" by the definition
+**The report is CHARACTER-DEPENDENT, and that is why it names the character.**
+`render()` needs a character, so inspection needs one too. A token sitting
+inside a block the character does not trigger -- `<!--IF_FLIGHT-->` for
+someone with no Flight -- is reported RESOLVED, because the block was
+stripped whole and the token does not survive rendering. That is exactly this
+module's definition of "resolved" (see below) and it is deliberate. But it
+means the report describes THIS character's render rather than the backend's
+capabilities, and a reader who does not know that would draw a false
+conclusion from a short unresolved list. `describe()` therefore leads with the
+character's name: a report that depends on a character must say which one.
+
+**How it is measured.** `render()` is called on the template with the given
+character and a set of harmless sentinel values, and the token set before is
+compared against the token set after. Whatever disappeared is "resolved" by the definition
 above -- there is no second, hand-maintained list of "the tokens we
 support" to drift out of sync with `render.py` the day someone adds one.
 See `tests/test_inspect.py::test_tracks_the_renderer_not_a_hardcoded_list`
@@ -100,24 +111,35 @@ class TemplateReport:
     tokens_used: tuple[str, ...]
     tokens_resolved: tuple[str, ...]
     tokens_unresolved: tuple[str, ...]
+    character_name: str = ""
 
 
-def inspect_template(template: Template) -> TemplateReport:
-    """Measure which of `template`'s tokens do not survive `render()` --
-    substituted or stripped, either counts as resolved. See the module
-    docstring for why "resolved" is defined that way."""
+def inspect_template(template: Template, hero) -> TemplateReport:
+    """Measure which of `template`'s tokens do not survive `render()` for
+    `hero` -- substituted or stripped, either counts as resolved.
+
+    See the module docstring for why "resolved" is defined that way, and why
+    the answer depends on which character is passed.
+    """
     used = _tokens_in_order(template.text)
-    rendered = render(template, **_SENTINELS)
+    rendered = render(template, hero, **_SENTINELS)
     survived = set(_tokens_in_order(rendered))
     resolved = tuple(token for token in used if token not in survived)
     unresolved = tuple(token for token in used if token in survived)
     return TemplateReport(tokens_used=used, tokens_resolved=resolved,
-                           tokens_unresolved=unresolved)
+                          tokens_unresolved=unresolved,
+                          character_name=getattr(hero, "name", "") or "")
 
 
 def describe(report: TemplateReport) -> str:
-    """A human-readable summary: the counts, then the unresolved worklist."""
+    """A human-readable summary: the character, the counts, then the
+    unresolved worklist.
+
+    The character is named FIRST because the counts mean nothing without it --
+    see the module docstring.
+    """
     lines = [
+        f"measured against: {report.character_name or '(unnamed character)'}",
         f"{len(report.tokens_used)} tokens used, "
         f"{len(report.tokens_resolved)} resolved, "
         f"{len(report.tokens_unresolved)} unresolved",
