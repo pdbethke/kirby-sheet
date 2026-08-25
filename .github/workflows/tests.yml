@@ -1,0 +1,36 @@
+name: Tests
+
+# kirby-sheet had no CI at all until 2026-08-25. The gap mattered: its
+# byte-fidelity tests -- the ones that export a character through real Hero
+# Designer and compare the output byte for byte -- SKIP unless
+# KIRBY_SHEET_ORACLE, KIRBY_SHEET_HDC and KIRBY_SHEET_HDE are set. A local run
+# without them reports "196 passed, 33 skipped" and looks green while the
+# package's central claim goes unverified.
+#
+# Those 33 cannot run here and never will: they need a licensed Hero Designer
+# installation, which this repository deliberately does not ship. So this
+# workflow gates what a reader can actually run, and the release workflow says
+# plainly that the oracle gate is a local, pre-release step.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install package + dev deps
+        run: pip install -e .[dev]
+      - name: Run tests
+        run: pytest -q --tb=short
+      - name: Report what skipped, so a silent skip is visible in the log
+        if: always()
+        run: pytest -q -rs --tb=no | tail -40
