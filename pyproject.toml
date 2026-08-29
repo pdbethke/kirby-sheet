@@ -19,7 +19,13 @@ license-files = ["LICENSE"]
 dependencies = ["kirby-cost>=0.4.0", "beautifulsoup4>=4.12"]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.4.0", "mypy>=1.5.0", "black>=23.0.0", "flake8>=6.0.0"]
+# pypdf is what tests/test_pdf_output.py READS the rendered PDF back with; the
+# PDF extra below is what WRITES it. A fresh `pip install -e ".[dev]"` failed
+# collection on `import pypdf` (2026-08-28) because it lived in neither group.
+# The dev group now pulls the pdf extra too, since the PDF tests are not
+# optional.
+dev = ["pytest>=7.4.0", "mypy>=1.5.0", "black>=23.0.0", "flake8>=6.0.0",
+       "pypdf>=4.0", "kirby-sheet[pdf]"]
 # xhtml2pdf pins reportlab<5 -- do not add reportlab directly, it arrives
 # transitively.
 pdf = ["xhtml2pdf>=0.2.17"]
